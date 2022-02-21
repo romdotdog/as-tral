@@ -21,7 +21,7 @@ async function search(dir: string): Promise<DirTree[]> {
 (async () => {
 	await asc.ready;
 
-	const main = await fs.readFile(path.join(__dirname, "assembly/main.ts"), {
+	const main = await fs.readFile(path.join(__dirname, "../assembly/main.ts"), {
 		encoding: "utf8"
 	});
 
@@ -40,12 +40,15 @@ async function search(dir: string): Promise<DirTree[]> {
 			encoding: "utf8"
 		});
 		const { binary, text, stdout, stderr } = asc.compileString(main + file, {
-			optimize: 2
+			optimize: 2,
+			converge: true,
+			enable: "simd"
 		});
 
+		console.log(text);
 		console.log(stdout.toString());
 
-		if (stderr[0]) {
+		if (binary === undefined) {
 			console.log("Errors found during compilation:");
 			console.log(stderr.toString());
 			continue;
