@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
-const path = require("path");
-const fs = require("fs/promises");
-const { exit } = require("process");
-const asc = require("assemblyscript/dist/asc");
+import path from "path";
+import fs from "fs/promises";
+import { exit } from "process";
+const asc: any = require("assemblyscript/dist/asc");
 
-async function search(dir) {
+type DirTree = DirTree[] | string;
+async function search(dir: string): Promise<DirTree[]> {
 	const dirents = await fs.readdir(dir, { withFileTypes: true });
 	const files = await Promise.all(
 		dirents.map(dirent => {
@@ -20,20 +21,24 @@ async function search(dir) {
 (async () => {
 	await asc.ready;
 
-	const main = await fs.readFile(path.join(__dirname, "assembly/main.ts"));
+	const main = await fs.readFile(path.join(__dirname, "assembly/main.ts"), {
+		encoding: "utf8"
+	});
 
 	let files;
 	try {
 		files = await search("assembly/__benches__");
-	} catch (e) {
+	} catch (e: any) {
 		console.log("ERROR: could not find directory " + e.path);
 		exit(1);
 	}
 
-	files = files.flat();
+	files = files.flat() as string[];
 	for (const filePath of files) {
 		console.log(`Compiling ${path.relative(".", filePath)}`);
-		const file = await fs.readFile(filePath);
+		const file = await fs.readFile(filePath, {
+			encoding: "utf8"
+		});
 		const { binary, text, stdout, stderr } = asc.compileString(main + file, {
 			optimize: 2
 		});
@@ -49,7 +54,7 @@ async function search(dir) {
 		await WebAssembly.instantiate(binary, {
 			input: {
 				now: performance.now,
-				result(time) {
+				result(time: number) {
 					console.log(((time * 1e6) >> 0) + "ns");
 				}
 			},
