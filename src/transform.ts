@@ -25,9 +25,10 @@ export function bench<T>(descriptor: u32, routine: () => T): void {
 }
 `;
 
+const encoder = new TextEncoder();
 class Astral extends Transform {
 	afterParse(parser: Parser) {
-		const enums = [];
+		const info: Info = { enumeration: [] };
 		for (const src of parser.sources) {
 			if (src.isLibrary) continue;
 			const range = src.statements[0]!.range;
@@ -65,17 +66,18 @@ class Astral extends Transform {
 							continue;
 
 						call.args[0] = Node.createIntegerLiteralExpression(
-							i64_new(enums.length),
+							i64_new(info.enumeration.length),
 							string.range
 						);
 
-						enums.push((<StringLiteralExpression>string).value);
+						info.enumeration.push((<StringLiteralExpression>string).value);
 					}
 				}
 			}
 		}
 
 		parser.parseFile(inject, "~lib/__astral__.ts", false);
+		this.writeFile("__astralinfo__", encoder.encode(JSON.stringify(info)), ".");
 	}
 }
 

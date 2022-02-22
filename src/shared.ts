@@ -1,0 +1,3 @@
+interface Info {
+	enumeration: string[];
+}

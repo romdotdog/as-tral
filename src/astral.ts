@@ -7,6 +7,7 @@ import glob from "fast-glob";
 import { exit } from "process";
 const asc: any = require("assemblyscript/dist/asc");
 
+const decoder = new TextDecoder();
 (async () => {
 	const fileMap = new Map<string, string>();
 	const folderMap = new Map<string, string[]>();
@@ -25,12 +26,18 @@ const asc: any = require("assemblyscript/dist/asc");
 		console.log(`Compiling ${path.relative(".", file)}`);
 
 		let binary: Uint8Array;
+		let info: Info;
 		asc.main(
 			[file, "--transform", path.join(__dirname, "transform.js"), "--optimize"],
 			{
 				stdout: process.stdout,
 				stderr: process.stderr,
 				writeFile(name: string, contents: Uint8Array, baseDir: string = ".") {
+					if (name == "__astralinfo__") {
+						info = JSON.parse(decoder.decode(contents));
+						return;
+					}
+
 					const ext = path.extname(name);
 
 					if (ext === ".wasm") {
@@ -88,7 +95,10 @@ const asc: any = require("assemblyscript/dist/asc");
 					__astral__: {
 						now: performance.now,
 						result(descriptor: number, time: number) {
-							console.log(descriptor, ((time * 1e6) >> 0) + "ns");
+							console.log(
+								info.enumeration[descriptor],
+								((time * 1e6) >> 0) + "ns"
+							);
 						}
 					},
 					env: {
