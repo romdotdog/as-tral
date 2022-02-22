@@ -1,71 +1,103 @@
 #!/usr/bin/env node
 
 import path from "path";
+import sfs from "fs";
 import fs from "fs/promises";
+import glob from "fast-glob";
 import { exit } from "process";
 const asc: any = require("assemblyscript/dist/asc");
 
-type DirTree = DirTree[] | string;
-async function search(dir: string): Promise<DirTree[]> {
-	const dirents = await fs.readdir(dir, { withFileTypes: true });
-	const files = await Promise.all(
-		dirents.map(dirent => {
-			const res = path.resolve(dir, dirent.name);
-			return dirent.isDirectory() ? search(res) : res;
-		})
-	);
-
-	return files;
-}
-
 (async () => {
-	await asc.ready;
+	const fileMap = new Map<string, string>();
+	const folderMap = new Map<string, string[]>();
 
-	const main = await fs.readFile(path.join(__dirname, "../assembly/main.ts"), {
-		encoding: "utf8"
-	});
+	await asc.ready;
 
 	let files;
 	try {
-		files = await search("assembly/__benches__");
+		files = await glob("assembly/__benches__/**/*.ts");
 	} catch (e: any) {
 		console.log("ERROR: could not find directory " + e.path);
 		exit(1);
 	}
 
-	files = files.flat() as string[];
-	for (const filePath of files) {
-		console.log(`Compiling ${path.relative(".", filePath)}`);
-		const file = await fs.readFile(filePath, {
-			encoding: "utf8"
-		});
-		const { binary, text, stdout, stderr } = asc.compileString(main + file, {
-			optimize: 2,
-			converge: true,
-			enable: "simd"
-		});
+	for (const file of files) {
+		console.log(`Compiling ${path.relative(".", file)}`);
 
-		console.log(text);
-		console.log(stdout.toString());
+		let binary: Uint8Array;
+		asc.main(
+			[file, "--transform", path.join(__dirname, "transform.js"), "--optimize"],
+			{
+				stdout: process.stdout,
+				stderr: process.stderr,
+				writeFile(name: string, contents: Uint8Array, baseDir: string = ".") {
+					const ext = path.extname(name);
 
-		if (binary === undefined) {
-			console.log("Errors found during compilation:");
-			console.log(stderr.toString());
-			continue;
-		}
+					if (ext === ".wasm") {
+						binary = contents;
+					} else if (ext === ".ts" || ext === ".map") {
+						return;
+					}
 
-		await WebAssembly.instantiate(binary, {
-			input: {
-				now: performance.now,
-				result(time: number) {
-					console.log(((time * 1e6) >> 0) + "ns");
+					const outfileName = path.join(
+						path.dirname(file),
+						path.basename(file, path.extname(file)) + ext
+					);
+
+					fs.writeFile(outfileName, contents);
+				},
+				readFile(filename: string, baseDir: string) {
+					const fileName = path.join(baseDir, filename);
+					if (fileMap.has(fileName)) {
+						return fileMap.get(fileName)!;
+					}
+
+					try {
+						const contents = sfs.readFileSync(fileName, { encoding: "utf8" });
+						fileMap.set(fileName, contents);
+						return contents;
+					} catch (e) {
+						return null;
+					}
+				},
+				listFiles(dirname: string, baseDir: string): string[] {
+					const folder = path.join(baseDir, dirname);
+					if (folderMap.has(folder)) {
+						return folderMap.get(folder)!;
+					}
+
+					try {
+						const results = sfs
+							.readdirSync(folder)
+							.filter(file => /^(?!.*\.d\.ts$).*\.ts$/.test(file));
+						folderMap.set(folder, results);
+						return results;
+					} catch (e) {
+						return [];
+					}
 				}
 			},
-			env: {
-				abort() {
-					console.log("wasm module aborted");
+			async (error: any) => {
+				if (error) {
+					console.log("Errors found during compilation:");
+					console.log(error);
+					return;
 				}
+
+				await WebAssembly.instantiate(binary, {
+					__astral__: {
+						now: performance.now,
+						result(descriptor: number, time: number) {
+							console.log(descriptor, ((time * 1e6) >> 0) + "ns");
+						}
+					},
+					env: {
+						abort() {
+							console.log("wasm module aborted");
+						}
+					}
+				});
 			}
-		});
+		);
 	}
 })();

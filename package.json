@@ -11,7 +11,8 @@
 		"astral": "./dist/astral.js"
 	},
 	"dependencies": {
-		"assemblyscript": "^0.19.23"
+		"assemblyscript": "^0.19.23",
+		"fast-glob": "^3.2.11"
 	},
 	"devDependencies": {
 		"@types/node": "^17.0.19",
