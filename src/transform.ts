@@ -11,20 +11,12 @@ import {
 	StringLiteralExpression
 } from "assemblyscript";
 
-const inject = `
-declare function now(): f64;
-declare function result(descriptor: u32, time: f64): void;
+import { join } from "path";
+import { readFileSync } from "fs";
 
-const blackbox = memory.data(16);
-export function bench<T>(descriptor: u32, routine: () => T): void {
-	let start = now();
-	for (let i = 0; i < 5000; i++) {
-		store<T>(blackbox, routine());
-	}
-	result(descriptor, now() - start);
-}
-`;
-
+const lib = readFileSync(join(__dirname, "../assembly/main.ts"), {
+	encoding: "utf8"
+});
 const encoder = new TextEncoder();
 class Astral extends Transform {
 	afterParse(parser: Parser) {
@@ -76,7 +68,7 @@ class Astral extends Transform {
 			}
 		}
 
-		parser.parseFile(inject, "~lib/__astral__.ts", false);
+		parser.parseFile(lib, "~lib/__astral__.ts", false);
 		this.writeFile("__astralinfo__", encoder.encode(JSON.stringify(info)), ".");
 	}
 }

@@ -4,5 +4,5 @@ declare function set(settings: {
 	mean?: boolean;
 	max?: boolean;
 	min?: boolean;
-});
-declare function bench(description: string, routine: () => void): void;
+}): void;
+declare function bench<T>(description: string, routine: () => T): void;
