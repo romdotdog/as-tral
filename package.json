@@ -8,7 +8,7 @@
 		"test": "node tests"
 	},
 	"bin": {
-		"astral": "./dist/astral.js"
+		"astral": "./dist/as-tral.js"
 	},
 	"dependencies": {
 		"assemblyscript": "^0.19.23",

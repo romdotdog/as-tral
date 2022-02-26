@@ -94,6 +94,13 @@ const decoder = new TextDecoder();
 				await WebAssembly.instantiate(binary, {
 					__astral__: {
 						now: performance.now,
+						warmup(descriptor: number) {
+							console.log(
+								`${info.enumeration[descriptor]}: warming up for ${
+									info.warmupTime / 1000
+								} seconds.`
+							);
+						},
 						result(descriptor: number, time: number) {
 							console.log(
 								info.enumeration[descriptor],

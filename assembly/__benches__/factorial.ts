@@ -1,3 +1,7 @@
+set({
+	warmupTime: 3000
+});
+
 function rFactorial(n: u64): u64 {
 	return n == 0 ? 1 : n * rFactorial(n - 1);
 }
