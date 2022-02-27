@@ -12,4 +12,5 @@ interface Settings {
 }
 
 declare function set(settings: Settings): void;
-declare function bench<T>(description: string, routine: () => T): void;
+declare function blackbox<T>(x: T): T;
+declare function bench(description: string, routine: () => void): void;

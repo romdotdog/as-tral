@@ -116,8 +116,13 @@ namespace Sorted {
 	}
 }
 
-const blackbox = memory.data(16); // TODO: replace
-export function bench<T>(descriptor: u32, routine: () => T): void {
+const blackboxArea = memory.data(128);
+export function blackbox<T>(x: T): T {
+	store<T>(blackboxArea, x);
+	return load<T>(blackboxArea);
+}
+
+export function bench(descriptor: u32, routine: () => void): void {
 	// warmup
 	let warmupIters: u64 = 1;
 	let totalWarmupIters: u64 = 0;
@@ -129,7 +134,7 @@ export function bench<T>(descriptor: u32, routine: () => T): void {
 		let start = now();
 
 		for (let i: u64 = 0; i < warmupIters; ++i) {
-			store<T>(blackbox, routine());
+			routine();
 		}
 
 		totalWarmupIters += totalWarmupIters;
@@ -160,7 +165,7 @@ export function bench<T>(descriptor: u32, routine: () => T): void {
 
 		const iters = mIters[i];
 		for (let j: u64 = 0; j < iters; ++j) {
-			store<T>(blackbox, routine());
+			routine();
 		}
 
 		const res = now() - start;

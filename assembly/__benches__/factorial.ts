@@ -6,10 +6,10 @@ function rFactorial(n: u64): u64 {
 	return n == 0 ? 1 : n * rFactorial(n - 1);
 }
 
-export let input = 20;
+let input = blackbox(20);
 
-bench<u64>("recursive factorial", () => {
-	return rFactorial(input);
+bench("recursive factorial", () => {
+	blackbox(rFactorial(input));
 });
 
 function lFactorial(n: u64): u64 {
@@ -20,6 +20,6 @@ function lFactorial(n: u64): u64 {
 	return r;
 }
 
-bench<u64>("loop factorial", () => {
-	return lFactorial(input);
+bench("loop factorial", () => {
+	blackbox(lFactorial(input));
 });
