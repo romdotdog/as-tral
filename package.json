@@ -12,6 +12,7 @@
 	},
 	"dependencies": {
 		"assemblyscript": "^0.19.23",
+		"chalk": "^4.0.0",
 		"fast-glob": "^3.2.11"
 	},
 	"devDependencies": {

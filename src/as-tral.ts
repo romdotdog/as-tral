@@ -5,6 +5,8 @@ import sfs from "fs";
 import fs from "fs/promises";
 import glob from "fast-glob";
 import { exit } from "process";
+import chalk from "chalk";
+
 const asc: any = require("assemblyscript/dist/asc");
 
 const decoder = new TextDecoder();
@@ -106,7 +108,9 @@ const decoder = new TextDecoder();
 							lb = ~~(lb * 1e6);
 							time = ~~(time * 1e6);
 							hb = ~~(hb * 1e6);
-							console.log(`[${lb}ns ${time}ns ${hb}ns]`);
+							console.log(
+								chalk`time: [{gray ${lb}ns} {bold ${time}ns} {gray ${hb}ns}]`
+							);
 						},
 						outliers(los: number, lom: number, him: number, his: number) {
 							const noutliers = los + lom + him + his;
@@ -118,8 +122,11 @@ const decoder = new TextDecoder();
 							const percent = (n: number) => (100 * n) / info.sampleSize;
 							const formatPercent = (n: number) => ~~(n * 100) / 100;
 							const nopercent = formatPercent(percent(noutliers));
+
 							console.log(
-								`Found ${noutliers} outliers among ${info.sampleSize} measurements (${nopercent}%)`
+								chalk.yellow(
+									`Found ${noutliers} outliers among ${info.sampleSize} measurements (${nopercent}%)`
+								)
 							);
 
 							const print = (n: number, label: string) => {
