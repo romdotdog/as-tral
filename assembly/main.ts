@@ -123,6 +123,22 @@ namespace Stats {
 	}
 }
 
+namespace Regression {
+	function dot(x: StaticArray<f64>, y: StaticArray<f64>): f64 {
+		let sum: f64 = 0;
+		for (let i = 0; i < x.length; ++i) {
+			sum += x[i] * y[i];
+		}
+		return sum;
+	}
+
+	export function fit(x: StaticArray<f64>, y: StaticArray<f64>): f64 {
+		const xy = dot(x, y);
+		const x2 = dot(x, x);
+		return xy / x2;
+	}
+}
+
 const blackboxArea = memory.data(128);
 export function blackbox<T>(x: T): T {
 	store<T>(blackboxArea, x);
@@ -166,7 +182,7 @@ export function bench(descriptor: u32, routine: () => void): void {
 	// TODO: start measurement
 
 	let expectedMs: f64 = 0;
-	const measurements = new StaticArray<f64>(__astral__sampleSize);
+	const times = new StaticArray<f64>(__astral__sampleSize);
 	const averageTimes = new StaticArray<f64>(__astral__sampleSize);
 	for (let i = 0; i < __astral__sampleSize; ++i) {
 		expectedMs += (mIters[i] as f64) * met;
@@ -182,7 +198,7 @@ export function bench(descriptor: u32, routine: () => void): void {
 			// TODO: error
 		}
 
-		measurements[i] = res;
+		times[i] = res;
 		averageTimes[i] = res / (iters as f64);
 	}
 
@@ -199,21 +215,22 @@ export function bench(descriptor: u32, routine: () => void): void {
 	const distMedian = new StaticArray<f64>(__astral__numResamples);
 	const distMAD = new StaticArray<f64>(__astral__numResamples);
 
-	const resample = new StaticArray<f64>(__astral__sampleSize);
+	const resampleY = new StaticArray<f64>(__astral__sampleSize);
 	for (let i = 0; i < __astral__numResamples; ++i) {
 		for (let j = 0; j < __astral__sampleSize; ++j) {
-			resample[j] = averageTimes[(Math.random() * __astral__sampleSize) as u32];
+			resampleY[j] =
+				averageTimes[(Math.random() * __astral__sampleSize) as u32];
 		}
 
-		resample.sort();
+		resampleY.sort();
 
-		const mean = Stats.mean(resample);
+		const mean = Stats.mean(resampleY);
 		distMean[i] = mean;
-		distStdDev[i] = Stats.stdDev(resample, mean);
+		distStdDev[i] = Stats.stdDev(resampleY, mean);
 
 		const median = Stats.sorted.median(distMedian);
 		distMedian[i] = median;
-		distMAD[i] = Stats.sorted.MAD(resample, median);
+		distMAD[i] = Stats.sorted.MAD(resampleY, median);
 	}
 
 	distMean.sort();
@@ -234,7 +251,33 @@ export function bench(descriptor: u32, routine: () => void): void {
 	const MADLB = Stats.sorted.CI.LB(distMAD);
 	const MADHB = Stats.sorted.CI.HB(distMAD);
 
-	// TODO: regression
+	// regression
 
-	result(meanLB, pointMean, meanHB);
+	if (!useFlatSampling) {
+		const mItersF = new StaticArray<f64>(__astral__sampleSize);
+		for (let i = 0; i < __astral__sampleSize; ++i) {
+			mItersF[i] = mIters[i] as f64;
+		}
+
+		const pointFit = Regression.fit(mItersF, times);
+
+		// bivariate bootstrapping
+		const resampleX = new StaticArray<f64>(__astral__sampleSize);
+		const distFit = new StaticArray<f64>(__astral__numResamples);
+		for (let i = 0; i < __astral__numResamples; ++i) {
+			for (let j = 0; j < __astral__sampleSize; ++j) {
+				const k = (Math.random() * __astral__sampleSize) as u32;
+				resampleX[j] = mItersF[k];
+				resampleY[j] = times[k];
+			}
+			distFit[i] = Regression.fit(resampleX, resampleY);
+		}
+
+		distFit.sort();
+		const slopeLB = Stats.sorted.CI.LB(distFit);
+		const slopeHB = Stats.sorted.CI.HB(distFit);
+		result(slopeLB, pointFit, slopeHB);
+	} else {
+		result(meanLB, pointMean, meanHB);
+	}
 }
