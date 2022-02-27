@@ -101,14 +101,16 @@ const decoder = new TextDecoder();
 								} seconds.`
 							);
 						},
-						result(descriptor: number, time: number) {
+						result(lb: number, time: number, hb: number) {
 							console.log(
-								info.enumeration[descriptor],
-								((time * 1e6) >> 0) + "ns"
+								`[${((lb * 1e6) >> 0) + "ns"} ${((time * 1e6) >> 0) + "ns"} ${
+									((hb * 1e6) >> 0) + "ns"
+								}]`
 							);
 						}
 					},
 					env: {
+						seed: Date.now,
 						abort() {
 							console.log("wasm module aborted");
 						}
