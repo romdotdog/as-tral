@@ -102,11 +102,38 @@ const decoder = new TextDecoder();
 							);
 						},
 						result(lb: number, time: number, hb: number) {
+							// TODO: correct units
+							lb = ~~(lb * 1e6);
+							time = ~~(time * 1e6);
+							hb = ~~(hb * 1e6);
+							console.log(`[${lb}ns ${time}ns ${hb}ns]`);
+						},
+						outliers(los: number, lom: number, him: number, his: number) {
+							const noutliers = los + lom + him + his;
+
+							if (noutliers == 0) {
+								return;
+							}
+
+							const percent = (n: number) => (100 * n) / info.sampleSize;
+							const formatPercent = (n: number) => ~~(n * 100) / 100;
+							const nopercent = formatPercent(percent(noutliers));
 							console.log(
-								`[${((lb * 1e6) >> 0) + "ns"} ${((time * 1e6) >> 0) + "ns"} ${
-									((hb * 1e6) >> 0) + "ns"
-								}]`
+								`Found ${noutliers} outliers among ${info.sampleSize} measurements (${nopercent}%)`
 							);
+
+							const print = (n: number, label: string) => {
+								if (n != 0) {
+									console.log(
+										`  ${n} (${formatPercent(percent(n))}%) ${label}`
+									);
+								}
+							};
+
+							print(los, "low severe");
+							print(lom, "low mild");
+							print(him, "high mild");
+							print(his, "high severe");
 						}
 					},
 					env: {

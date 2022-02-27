@@ -1,6 +1,7 @@
 declare function now(): f64;
 declare function warmup(descriptor: u32): void;
 declare function result(timeLB: f64, time: f64, timeHB: f64): void;
+declare function outliers(los: u32, lom: u32, him: u32, his: u32): void;
 
 namespace Sampling {
 	export function chooseSamplingMode(met: f64): bool {
@@ -181,11 +182,11 @@ export function bench(descriptor: u32, routine: () => void): void {
 
 	// TODO: start measurement
 
-	let expectedMs: f64 = 0;
+	//let expectedMs: f64 = 0;
 	const times = new StaticArray<f64>(__astral__sampleSize);
 	const averageTimes = new StaticArray<f64>(__astral__sampleSize);
 	for (let i = 0; i < __astral__sampleSize; ++i) {
-		expectedMs += (mIters[i] as f64) * met;
+		//expectedMs += (mIters[i] as f64) * met;
 		let start = now();
 
 		const iters = mIters[i];
@@ -280,4 +281,29 @@ export function bench(descriptor: u32, routine: () => void): void {
 	} else {
 		result(meanLB, pointMean, meanHB);
 	}
+
+	const mild = 1.5;
+	const severe = 3;
+
+	const q1 = Stats.sorted.percentile(averageTimes, 25);
+	const q3 = Stats.sorted.percentile(averageTimes, 75);
+	const iqr = q3 - q1;
+	const lost = q1 - severe * iqr;
+	const lomt = q1 - mild * iqr;
+	const himt = q3 + mild * iqr;
+	const hist = q3 + severe * iqr;
+
+	let los = 0;
+	let lom = 0;
+	let him = 0;
+	let his = 0;
+	for (let i = 0; i < __astral__sampleSize; i++) {
+		const x = averageTimes[i];
+		if (x < lost) ++los;
+		else if (x > hist) ++his;
+		else if (x < lomt) ++lom;
+		else if (x > himt) ++him;
+	}
+
+	outliers(los, lom, him, his);
 }
