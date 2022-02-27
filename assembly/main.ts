@@ -2,117 +2,124 @@ declare function now(): f64;
 declare function warmup(descriptor: u32): void;
 declare function result(timeLB: f64, time: f64, timeHB: f64): void;
 
-function chooseSamplingMode(met: f64): bool {
-	// https://github.com/bheisler/criterion.rs/blob/970aa04aa5ee0514d1930c83a58c6ca994727567/src/lib.rs#L1416
-	const sampleCount = __astral__sampleSize as u64;
-	const targetTime = __astral__measurementTime as f64;
-	const totalRuns = ((sampleCount * (sampleCount + 1)) / 2) as f64;
-	const d = ceil(targetTime / met / totalRuns);
-	const expectedMs = totalRuns * d * met;
-	return expectedMs > 2 * targetTime;
-}
-
-function linearSampling(met: f64): StaticArray<u64> {
-	const sampleCount = __astral__sampleSize as u64;
-	const targetTime = __astral__measurementTime as f64;
-	const totalRuns = ((sampleCount * (sampleCount + 1)) / 2) as f64;
-	const df = max(1, ceil(targetTime / met / totalRuns));
-	const d = df as u64;
-
-	if (d == 1) {
-		// TODO: warning
-		const expectedMs = totalRuns * df * met;
+namespace Sampling {
+	export function chooseSamplingMode(met: f64): bool {
+		// https://github.com/bheisler/criterion.rs/blob/970aa04aa5ee0514d1930c83a58c6ca994727567/src/lib.rs#L1416
+		const sampleCount = __astral__sampleSize as u64;
+		const targetTime = __astral__measurementTime as f64;
+		const totalRuns = ((sampleCount * (sampleCount + 1)) / 2) as f64;
+		const d = ceil(targetTime / met / totalRuns);
+		const expectedMs = totalRuns * d * met;
+		return expectedMs > 2 * targetTime;
 	}
 
-	const sci32 = sampleCount as i32; // ??
-	const arr = new StaticArray<u64>(sci32);
-	for (let i = 0, a = 1; i < sci32; i = a++) {
-		arr[i] = a * d;
-	}
-	return arr;
-}
+	export function linearSampling(met: f64): StaticArray<u64> {
+		const sampleCount = __astral__sampleSize as u64;
+		const targetTime = __astral__measurementTime as f64;
+		const totalRuns = ((sampleCount * (sampleCount + 1)) / 2) as f64;
+		const df = max(1, ceil(targetTime / met / totalRuns));
+		const d = df as u64;
 
-function flatSampling(met: f64): StaticArray<u64> {
-	const sampleCount = __astral__sampleSize;
-	const msPerSample = (__astral__measurementTime as f64) / (sampleCount as f64);
-	// provisional
-	const iterationsPerSample = max(1, ceil(msPerSample / met) as u64);
-
-	if (iterationsPerSample == 1) {
-		// TODO: warning
-		const expectedMs = ((iterationsPerSample * sampleCount) as f64) * met;
-	}
-
-	const arr = new StaticArray<u64>(sampleCount);
-	for (let i = 0; i < sampleCount; ++i) {
-		arr[i] = iterationsPerSample;
-	}
-	return arr;
-}
-
-// https://github.com/bheisler/criterion.rs/blob/ceade3b1d72c3ecef0896cbe0dee12f43a6ce240/src/stats/univariate/sample.rs#L18
-function calcMean(sample: StaticArray<f64>): f64 {
-	return sample.reduce<f64>((a, b) => a + b, 0) / sample.length;
-}
-
-function calcVariance(sample: StaticArray<f64>, mean: f64): f64 {
-	let sum: f64 = 0;
-	for (let i = 0; i < sample.length; ++i) {
-		sum += (sample[i] - mean) ** 2;
-	}
-	return sum / (sample.length - 1);
-}
-
-function calcStdDev(sample: StaticArray<f64>, mean: f64): f64 {
-	return sqrt(calcVariance(sample, mean));
-}
-
-// invariant: sample must be sorted
-namespace Sorted {
-	export function calcMedian(sample: StaticArray<f64>): f64 {
-		const n = sample.length;
-		if (n % 2 == 1) {
-			return sample[n / 2];
-		} else {
-			const i = n / 2;
-			return (sample[i - 1] + sample[i]) / 2;
+		if (d == 1) {
+			// TODO: warning
+			const expectedMs = totalRuns * df * met;
 		}
+
+		const sci32 = sampleCount as i32; // ??
+		const arr = new StaticArray<u64>(sci32);
+		for (let i = 0, a = 1; i < sci32; i = a++) {
+			arr[i] = a * d;
+		}
+		return arr;
 	}
 
-	export function calcMAD(sample: StaticArray<f64>, median: f64): f64 {
-		const absDevs = new StaticArray<f64>(sample.length);
+	export function flatSampling(met: f64): StaticArray<u64> {
+		const sampleCount = __astral__sampleSize;
+		const msPerSample =
+			(__astral__measurementTime as f64) / (sampleCount as f64);
+		// provisional
+		const iterationsPerSample = max(1, ceil(msPerSample / met) as u64);
+
+		if (iterationsPerSample == 1) {
+			// TODO: warning
+			const expectedMs = ((iterationsPerSample * sampleCount) as f64) * met;
+		}
+
+		const arr = new StaticArray<u64>(sampleCount);
+		for (let i = 0; i < sampleCount; ++i) {
+			arr[i] = iterationsPerSample;
+		}
+		return arr;
+	}
+}
+
+namespace Stats {
+	// https://github.com/bheisler/criterion.rs/blob/ceade3b1d72c3ecef0896cbe0dee12f43a6ce240/src/stats/univariate/sample.rs#L18
+	export function mean(sample: StaticArray<f64>): f64 {
+		return sample.reduce<f64>((a, b) => a + b, 0) / sample.length;
+	}
+
+	function variance(sample: StaticArray<f64>, mean: f64): f64 {
+		let sum: f64 = 0;
 		for (let i = 0; i < sample.length; ++i) {
-			absDevs[i] = abs(sample[i] - median);
+			sum += (sample[i] - mean) ** 2;
+		}
+		return sum / (sample.length - 1);
+	}
+
+	export function stdDev(sample: StaticArray<f64>, mean: f64): f64 {
+		return sqrt(variance(sample, mean));
+	}
+
+	// invariant: sample must be sorted
+	export namespace sorted {
+		export function median(sample: StaticArray<f64>): f64 {
+			const n = sample.length;
+			if (n % 2 == 1) {
+				return sample[n / 2];
+			} else {
+				const i = n / 2;
+				return (sample[i - 1] + sample[i]) / 2;
+			}
 		}
 
-		absDevs.sort();
-		return calcMedian(absDevs) * 1.4826;
-	}
+		export function MAD(sample: StaticArray<f64>, median: f64): f64 {
+			const absDevs = new StaticArray<f64>(sample.length);
+			for (let i = 0; i < sample.length; ++i) {
+				absDevs[i] = abs(sample[i] - median);
+			}
 
-	// unchecked
-	// - p must be in the range [0, 100]
-	export function calcPercentile(sample: StaticArray<f64>, p: f64): f64 {
-		const len = sample.length - 1;
-		if (p == 100) {
-			return sample[len];
+			absDevs.sort();
+			return sorted.median(absDevs) * 1.4826;
 		}
 
-		const rank: f64 = (p / 100) * len;
-		const integer = floor(rank);
-		const fraction = rank - integer;
-		const n = integer as u32;
-		const flooring = unchecked(sample[n]);
-		const ceiling = unchecked(sample[n + 1]);
+		// unchecked
+		// - p must be in the range [0, 100]
+		export function percentile(sample: StaticArray<f64>, p: f64): f64 {
+			const len = sample.length - 1;
+			if (p == 100) {
+				return sample[len];
+			}
 
-		return flooring + (ceiling - flooring) * fraction;
-	}
+			const rank: f64 = (p / 100) * len;
+			const integer = floor(rank);
+			const fraction = rank - integer;
+			const n = integer as u32;
+			const flooring = unchecked(sample[n]);
+			const ceiling = unchecked(sample[n + 1]);
 
-	export function calcCILB(sample: StaticArray<f64>): f64 {
-		return calcPercentile(sample, 50 * (1 - __astral__confidenceLevel));
-	}
+			return flooring + (ceiling - flooring) * fraction;
+		}
 
-	export function calcCIHB(sample: StaticArray<f64>): f64 {
-		return calcPercentile(sample, 50 * (1 + __astral__confidenceLevel));
+		export namespace CI {
+			export function LB(sample: StaticArray<f64>): f64 {
+				return percentile(sample, 50 * (1 - __astral__confidenceLevel));
+			}
+
+			export function HB(sample: StaticArray<f64>): f64 {
+				return percentile(sample, 50 * (1 + __astral__confidenceLevel));
+			}
+		}
 	}
 }
 
@@ -149,10 +156,12 @@ export function bench(descriptor: u32, routine: () => void): void {
 	const met = warmupElapsedTime / (totalWarmupIters as f64);
 	const useFlatSampling =
 		__astral__samplingMode == 0
-			? chooseSamplingMode(met)
+			? Sampling.chooseSamplingMode(met)
 			: __astral__samplingMode == 2;
 
-	const mIters = useFlatSampling ? flatSampling(met) : linearSampling(met);
+	const mIters = useFlatSampling
+		? Sampling.flatSampling(met)
+		: Sampling.linearSampling(met);
 
 	// TODO: start measurement
 
@@ -179,10 +188,10 @@ export function bench(descriptor: u32, routine: () => void): void {
 
 	averageTimes.sort();
 
-	const pointMean = calcMean(averageTimes);
-	const pointStdDev = calcStdDev(averageTimes, pointMean);
-	const pointMedian = Sorted.calcMedian(averageTimes);
-	const pointMAD = Sorted.calcMAD(averageTimes, pointMedian);
+	const pointMean = Stats.mean(averageTimes);
+	const pointStdDev = Stats.stdDev(averageTimes, pointMean);
+	const pointMedian = Stats.sorted.median(averageTimes);
+	const pointMAD = Stats.sorted.MAD(averageTimes, pointMedian);
 
 	// bootstrapping
 	const distMean = new StaticArray<f64>(__astral__numResamples);
@@ -198,13 +207,13 @@ export function bench(descriptor: u32, routine: () => void): void {
 
 		resample.sort();
 
-		const mean = calcMean(resample);
+		const mean = Stats.mean(resample);
 		distMean[i] = mean;
-		distStdDev[i] = calcStdDev(resample, mean);
+		distStdDev[i] = Stats.stdDev(resample, mean);
 
-		const median = Sorted.calcMedian(distMedian);
+		const median = Stats.sorted.median(distMedian);
 		distMedian[i] = median;
-		distMAD[i] = Sorted.calcMAD(resample, median);
+		distMAD[i] = Stats.sorted.MAD(resample, median);
 	}
 
 	distMean.sort();
@@ -213,17 +222,17 @@ export function bench(descriptor: u32, routine: () => void): void {
 	distMAD.sort();
 
 	// confidence interval
-	const meanLB = Sorted.calcCILB(distMean);
-	const meanHB = Sorted.calcCIHB(distMean);
+	const meanLB = Stats.sorted.CI.LB(distMean);
+	const meanHB = Stats.sorted.CI.HB(distMean);
 
-	const stdDevLB = Sorted.calcCILB(distStdDev);
-	const stdDevHB = Sorted.calcCIHB(distStdDev);
+	const stdDevLB = Stats.sorted.CI.LB(distStdDev);
+	const stdDevHB = Stats.sorted.CI.HB(distStdDev);
 
-	const medianLB = Sorted.calcCILB(distMedian);
-	const medianHB = Sorted.calcCIHB(distMedian);
+	const medianLB = Stats.sorted.CI.LB(distMedian);
+	const medianHB = Stats.sorted.CI.HB(distMedian);
 
-	const MADLB = Sorted.calcCILB(distMAD);
-	const MADHB = Sorted.calcCIHB(distMAD);
+	const MADLB = Stats.sorted.CI.LB(distMAD);
+	const MADHB = Stats.sorted.CI.HB(distMAD);
 
 	// TODO: regression
 
