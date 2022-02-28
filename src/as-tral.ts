@@ -93,23 +93,55 @@ const decoder = new TextDecoder();
 					return;
 				}
 
+				function short(n: number): string {
+					if (n < 10) {
+						return (~~(n * 1e4) / 1e4).toString();
+					} else if (n < 100) {
+						return (~~(n * 1e3) / 1e3).toString();
+					} else if (n < 1000) {
+						return (~~(n * 1e2) / 1e2).toString();
+					} else if (n < 10000) {
+						return (~~(n * 1e1) / 1e1).toString();
+					} else {
+						return (~~n).toString();
+					}
+				}
+
+				function formatTime(ms: number): string {
+					if (ms < 10e-6) {
+						return short(ms * 1e9) + "ps";
+					} else if (ms < 10e-3) {
+						return short(ms * 1e6) + "ns";
+					} else if (ms < 10) {
+						return short(ms * 1e3) + "us";
+					} else if (ms < 10e3) {
+						return short(ms) + "ms";
+					} else {
+						return short(ms * 1e-3) + "s";
+					}
+				}
+
+				let currentBench = "";
 				await WebAssembly.instantiate(binary, {
 					__astral__: {
 						now: performance.now,
 						warmup(descriptor: number) {
+							currentBench = info.enumeration[descriptor];
 							console.log(
-								`${info.enumeration[descriptor]}: warming up for ${
+								`${currentBench}: warming up for ${
 									info.warmupTime / 1000
 								} seconds.`
 							);
 						},
 						result(lb: number, time: number, hb: number) {
-							// TODO: correct units
-							lb = ~~(lb * 1e6);
-							time = ~~(time * 1e6);
-							hb = ~~(hb * 1e6);
+							const header =
+								currentBench + " ".repeat(24 - currentBench.length);
+							const lbs = formatTime(lb);
+							const times = formatTime(time);
+							const hbs = formatTime(hb);
+
 							console.log(
-								chalk`time: [{gray ${lb}ns} {bold ${time}ns} {gray ${hb}ns}]`
+								chalk`${header}time: [{gray ${lbs}} {bold ${times}} {gray ${hbs}}]`
 							);
 						},
 						outliers(los: number, lom: number, him: number, his: number) {
