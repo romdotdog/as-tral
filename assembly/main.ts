@@ -1,7 +1,15 @@
 declare function now(): f64;
 declare function warmup(descriptor: u32): void;
+declare function start(estimatedMs: f64, iterCount: f64): void;
+declare function analyzing(): void;
+declare function faultyConfig(
+	linear: i32,
+	actualTime: f64,
+	recommendedSampleSize: f64
+): void;
+declare function faultyBenchmark(): void;
 declare function result(timeLB: f64, time: f64, timeHB: f64): void;
-declare function outliers(los: u32, lom: u32, him: u32, his: u32): void;
+declare function outliers(los: i32, lom: i32, him: i32, his: i32): void;
 
 namespace Sampling {
 	export function chooseSamplingMode(met: f64): bool {
@@ -22,8 +30,8 @@ namespace Sampling {
 		const d = df as u64;
 
 		if (d == 1) {
-			// TODO: warning
 			const expectedMs = totalRuns * df * met;
+			faultyConfig(1, expectedMs, recommendLinearSampleSize(met));
 		}
 
 		const sci32 = sampleCount as i32; // ??
@@ -42,8 +50,8 @@ namespace Sampling {
 		const iterationsPerSample = max(1, ceil(msPerSample / met) as u64);
 
 		if (iterationsPerSample == 1) {
-			// TODO: warning
 			const expectedMs = ((iterationsPerSample * sampleCount) as f64) * met;
+			faultyConfig(0, expectedMs, recommendFlatSampleSize(met));
 		}
 
 		const arr = new StaticArray<u64>(sampleCount);
@@ -51,6 +59,21 @@ namespace Sampling {
 			arr[i] = iterationsPerSample;
 		}
 		return arr;
+	}
+
+	function recommendLinearSampleSize(met: f64): f64 {
+		const targetTime = __astral__measurementTime as f64;
+		const c = targetTime / met;
+		let sampleSize = (-1.0 + sqrt(4.0 * c) / 2) as u64;
+		sampleSize = (sampleSize / 10) * 10;
+		return max(10, sampleSize) as f64;
+	}
+
+	function recommendFlatSampleSize(met: f64): f64 {
+		const targetTime = __astral__measurementTime as f64;
+		let sampleSize = (targetTime / met) as u64;
+		sampleSize = (sampleSize / 10) * 10;
+		return max(10, sampleSize) as f64;
 	}
 }
 
@@ -161,7 +184,7 @@ export function bench(descriptor: u32, routine: () => void): void {
 			routine();
 		}
 
-		totalWarmupIters += totalWarmupIters;
+		totalWarmupIters += warmupIters;
 		warmupElapsedTime += now() - start;
 		if (warmupElapsedTime > __astral__warmupTime) {
 			break;
@@ -180,13 +203,19 @@ export function bench(descriptor: u32, routine: () => void): void {
 		? Sampling.flatSampling(met)
 		: Sampling.linearSampling(met);
 
-	// TODO: start measurement
+	let expectedMs: f64 = 0;
+	let totalIters: f64 = 0;
+	for (let i = 0; i < __astral__sampleSize; ++i) {
+		const iters = mIters[i] as f64;
+		expectedMs += iters * met;
+		totalIters += iters;
+	}
+	start(expectedMs, totalIters);
 
-	//let expectedMs: f64 = 0;
+	let notWarned = true;
 	const times = new StaticArray<f64>(__astral__sampleSize);
 	const averageTimes = new StaticArray<f64>(__astral__sampleSize);
 	for (let i = 0; i < __astral__sampleSize; ++i) {
-		//expectedMs += (mIters[i] as f64) * met;
 		let start = now();
 
 		const iters = mIters[i];
@@ -195,13 +224,16 @@ export function bench(descriptor: u32, routine: () => void): void {
 		}
 
 		const res = now() - start;
-		if (res == 0) {
-			// TODO: error
+		if (res == 0 && notWarned) {
+			faultyBenchmark();
+			notWarned = false;
 		}
 
 		times[i] = res;
 		averageTimes[i] = res / (iters as f64);
 	}
+
+	analyzing();
 
 	averageTimes.sort();
 

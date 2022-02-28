@@ -121,16 +121,75 @@ const decoder = new TextDecoder();
 					}
 				}
 
+				function formatIterCount(i: number) {
+					if (i < 10e3) {
+						return `${i} iterations`;
+					} else if (i < 1e6) {
+						return `${~~(i / 1000)}k iterations`;
+					} else if (i < 10e6) {
+						return `${~~(i / 1e5) / 10}M iterations`;
+					} else if (i < 1e9) {
+						return `${~~(i / 1e6)}M iterations`;
+					} else if (i < 10e9) {
+						return `${~~(i / 1e8) / 10}B iterations`;
+					} else {
+						return `${~~(i / 1e9)}B iterations`;
+					}
+				}
+
 				let currentBench = "";
 				await WebAssembly.instantiate(binary, {
 					__astral__: {
 						now: performance.now,
 						warmup(descriptor: number) {
 							currentBench = info.enumeration[descriptor];
+							console.log();
 							console.log(
-								`${currentBench}: warming up for ${
-									info.warmupTime / 1000
-								} seconds.`
+								`Benchmarking ${currentBench}: Warming up for ${formatTime(
+									info.warmupTime
+								)}`
+							);
+						},
+						start(estimatedMs: number, iterCount: number) {
+							console.log(
+								`Benchmarking ${currentBench}: Collecting ${
+									info.sampleSize
+								} samples in estimated ${formatTime(
+									estimatedMs
+								)} (${formatIterCount(iterCount)})`
+							);
+						},
+						analyzing() {
+							console.log(`Benchmarking ${currentBench}: Analyzing`);
+						},
+						faultyConfig(
+							linear: number,
+							actualTime: number,
+							recommendedSampleSize: number
+						) {
+							let msg = `Warning: Unable to complete ${
+								info.sampleSize
+							} samples in ${formatTime(
+								info.measurementTime
+							)}. You may wish to increase target time to ${actualTime}`;
+
+							if (linear == 1) {
+								if (info.sampleSize != recommendedSampleSize) {
+									msg += `, enable flat sampling, or reduce sample count to ${recommendedSampleSize}`;
+								} else {
+									msg += ` or enable flat sampling.`;
+								}
+							} else if (info.sampleSize != recommendedSampleSize) {
+								msg += `or reduce sample count to ${recommendedSampleSize}`;
+							} else {
+								msg += `.`;
+							}
+
+							console.log(msg);
+						},
+						faultyBenchmark() {
+							console.log(
+								`At least one measurement of benchmark ${currentBench} took zero time per iteration. This should not be possible. Please verify that you have blackboxed both your function arguments and return values.`
 							);
 						},
 						result(lb: number, time: number, hb: number) {
