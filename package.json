@@ -1,22 +1,23 @@
 {
-	"name": "as-tral",
-	"version": "1.0.0",
-	"scripts": {
-		"asbuild:untouched": "asc assembly/index.ts --target debug",
-		"asbuild:optimized": "asc assembly/index.ts --target release",
-		"asbuild": "npm run asbuild:untouched && npm run asbuild:optimized",
-		"test": "node tests"
-	},
-	"bin": {
-		"astral": "./dist/as-tral.js"
-	},
-	"dependencies": {
-		"assemblyscript": "^0.19.23",
-		"chalk": "^4.0.0",
-		"fast-glob": "^3.2.11"
-	},
-	"devDependencies": {
-		"@types/node": "^17.0.19",
-		"typescript": "^4.5.5"
-	}
+    "name": "as-tral",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "asbuild:untouched": "asc assembly/index.ts --target debug",
+        "asbuild:optimized": "asc assembly/index.ts --target release",
+        "asbuild": "npm run asbuild:untouched && npm run asbuild:optimized",
+        "test": "node tests"
+    },
+    "bin": {
+        "astral": "./dist/as-tral.js"
+    },
+    "dependencies": {
+        "assemblyscript": "^0.20.4",
+        "chalk": "^4.0.0",
+        "fast-glob": "^3.2.11"
+    },
+    "devDependencies": {
+        "@types/node": "^17.0.19",
+        "typescript": "^4.5.5"
+    }
 }
