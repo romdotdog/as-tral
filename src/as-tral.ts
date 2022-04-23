@@ -113,53 +113,10 @@ async function compileFile(file: string) {
     }
 
     // https://github.com/Microsoft/TypeScript/issues/11498
-    const info: Info = infoOrNull;
-    const binary: Uint8Array = binaryOrNull;
+    await benchWASM(infoOrNull, binaryOrNull);
+}
 
-    function short(n: number): string {
-        if (n < 10) {
-            return (~~(n * 1e4) / 1e4).toString();
-        } else if (n < 100) {
-            return (~~(n * 1e3) / 1e3).toString();
-        } else if (n < 1000) {
-            return (~~(n * 1e2) / 1e2).toString();
-        } else if (n < 10000) {
-            return (~~(n * 1e1) / 1e1).toString();
-        } else {
-            return (~~n).toString();
-        }
-    }
-
-    function formatTime(ms: number): string {
-        if (ms < 10e-6) {
-            return short(ms * 1e9) + "ps";
-        } else if (ms < 10e-3) {
-            return short(ms * 1e6) + "ns";
-        } else if (ms < 10) {
-            return short(ms * 1e3) + "us";
-        } else if (ms < 10e3) {
-            return short(ms) + "ms";
-        } else {
-            return short(ms * 1e-3) + "s";
-        }
-    }
-
-    function formatIterCount(i: number) {
-        if (i < 10e3) {
-            return `${i} iterations`;
-        } else if (i < 1e6) {
-            return `${~~(i / 1000)}k iterations`;
-        } else if (i < 10e6) {
-            return `${~~(i / 1e5) / 10}M iterations`;
-        } else if (i < 1e9) {
-            return `${~~(i / 1e6)}M iterations`;
-        } else if (i < 10e9) {
-            return `${~~(i / 1e8) / 10}B iterations`;
-        } else {
-            return `${~~(i / 1e9)}B iterations`;
-        }
-    }
-
+async function benchWASM(info: Info, binary: Uint8Array) {
     let currentBench = "";
     await WebAssembly.instantiate(binary, {
         __astral__: {
@@ -262,4 +219,48 @@ async function compileFile(file: string) {
             }
         }
     });
+}
+
+function short(n: number): string {
+    if (n < 10) {
+        return (~~(n * 1e4) / 1e4).toString();
+    } else if (n < 100) {
+        return (~~(n * 1e3) / 1e3).toString();
+    } else if (n < 1000) {
+        return (~~(n * 1e2) / 1e2).toString();
+    } else if (n < 10000) {
+        return (~~(n * 1e1) / 1e1).toString();
+    } else {
+        return (~~n).toString();
+    }
+}
+
+function formatTime(ms: number): string {
+    if (ms < 10e-6) {
+        return short(ms * 1e9) + "ps";
+    } else if (ms < 10e-3) {
+        return short(ms * 1e6) + "ns";
+    } else if (ms < 10) {
+        return short(ms * 1e3) + "us";
+    } else if (ms < 10e3) {
+        return short(ms) + "ms";
+    } else {
+        return short(ms * 1e-3) + "s";
+    }
+}
+
+function formatIterCount(i: number) {
+    if (i < 10e3) {
+        return `${i} iterations`;
+    } else if (i < 1e6) {
+        return `${~~(i / 1000)}k iterations`;
+    } else if (i < 10e6) {
+        return `${~~(i / 1e5) / 10}M iterations`;
+    } else if (i < 1e9) {
+        return `${~~(i / 1e6)}M iterations`;
+    } else if (i < 10e9) {
+        return `${~~(i / 1e8) / 10}B iterations`;
+    } else {
+        return `${~~(i / 1e9)}B iterations`;
+    }
 }
