@@ -1,0 +1,47 @@
+ 
+<svg viewBox="0 0 1140 312" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">  
+    <style type="text/css">
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500');
+
+        svg {
+            dominant-baseline: hanging;
+        }
+
+        @keyframes anim {
+            0% {
+                transform: rotate(45deg) translateY(-250%);
+            }
+            to {
+                transform: rotate(45deg) translateY(-600%);
+            }
+        }
+
+        #anim {
+            animation: anim infinite linear 60s; 
+        }
+    </style>
+    <defs>  
+        <mask id="mask" x="0" y="0">  
+            <text font-family="Inter" font-weight="bold" font-size="256px" fill="#fff">AS-TRAL</text>  
+        </mask>  
+    </defs>
+    <g mask="url(#mask)">
+        <g id="anim">
+            <rect width="100%" height="100%" fill="#fb4934"  />
+            <rect width="100%" height="100%" y="50%" fill="#fe8019"  />
+            <rect width="100%" height="100%" y="100%" fill="#fabd2f"  />
+            <rect width="100%" height="100%" y="150%" fill="#b8bb26"  />
+            <rect width="100%" height="100%" y="200%" fill="#8ec07c"  />
+            <rect width="100%" height="100%" y="250%" fill="#83a598"  />
+            <rect width="100%" height="100%" y="300%" fill="#d3869b"  />
+
+            <rect width="100%" height="100%" y="350%" fill="#fb4934"  />
+            <rect width="100%" height="100%" y="400%" fill="#fe8019"  />
+            <rect width="100%" height="100%" y="450%" fill="#fabd2f"  />
+            <rect width="100%" height="100%" y="500%" fill="#b8bb26"  />
+            <rect width="100%" height="100%" y="550%" fill="#8ec07c"  />
+            <rect width="100%" height="100%" y="600%" fill="#83a598"  />
+            <rect width="100%" height="100%" y="650%" fill="#d3869b"  />
+        </g>
+    </g>
+</svg>
