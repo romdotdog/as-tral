@@ -20,6 +20,38 @@ import {
 import { join } from "path";
 import { readFileSync } from "fs";
 
+// sort of a hack to get globals exported
+const reexport = [
+    "baselineIters",
+    "baselineTimes",
+    "flags",
+
+    "meanLB",
+    "meanHB",
+    "meanPoint",
+    "meanError",
+
+    "medianLB",
+    "medianHB",
+    "medianPoint",
+    "medianError",
+
+    "MADLB",
+    "MADHB",
+    "MADPoint",
+    "MADError",
+
+    "slopeLB",
+    "slopeHB",
+    "slopePoint",
+    "slopeError",
+
+    "stdDevLB",
+    "stdDevHB",
+    "stdDevPoint",
+    "stdDevError",
+];
+
 const __dirname = new URL('.', import.meta.url).pathname;
 const lib = readFileSync(join(__dirname, "../assembly/main.ts"), {
     encoding: "utf8"
@@ -74,13 +106,24 @@ class Astral extends Transform {
                         Node.createIdentifierExpression("blackbox", range),
                         null,
                         range
-                    )
+                    ),
                 ],
                 Node.createStringLiteralExpression("__astral__", range),
                 range
             );
 
-            src.statements.unshift(imp);
+            const exp = Node.createExportStatement(
+                reexport.map(v => Node.createExportMember(
+                    Node.createIdentifierExpression(v, range),
+                    null,
+                    range
+                )),
+                Node.createStringLiteralExpression("__astral__", range),
+                false,
+                range
+            );
+
+            src.statements.unshift(imp, exp);
             for (let i = 0; i < src.statements.length; i++) {
                 const stmt = src.statements[i];
                 if (stmt.kind == NodeKind.EXPRESSION) {
@@ -329,7 +372,7 @@ class Astral extends Transform {
             }
         }
 
-        parser.parseFile(lib, "~lib/__astral__.ts", true);
+        parser.parseFile(lib, "~lib/__astral__.ts", false);
         const src = parser.sources[parser.sources.length - 1]!;
 
         function createGlobal(name: keyof Settings, type: "f64" | "u32") {
