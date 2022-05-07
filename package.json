@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "type": "module",
     "files": [
+        "/as-tral.d.ts",
         "/assembly",
         "/dist"
     ],
