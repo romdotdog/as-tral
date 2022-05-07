@@ -156,48 +156,7 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                     )}`
                 );
 
-                sfs.mkdirSync(path.join(baselineDir, currentBench), { recursive: true });
-                const samplePath = path.join(baselineDir, currentBench, "sample.json");
-                const estimatesPath = path.join(baselineDir, currentBench, "estimates.json");
-                if (sfs.existsSync(samplePath) && sfs.existsSync(estimatesPath)) {
-                    const memory = <WebAssembly.Memory><unknown>exports.memory;
-
-                    const sample: Sample = JSON.parse(sfs.readFileSync(samplePath, { encoding: "utf-8" }));
-                    const baselineIters = new BigUint64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineIters).value, info.sampleSize);
-                    const baselineTimes = new Float64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineTimes).value, info.sampleSize);
-
-                    if (info.sampleSize !== sample.iters?.length || info.sampleSize !== sample.times?.length) {
-                        console.log("Warning: unsupported sample size mismatch"); // TODO?
-                        return;
-                    }
-
-                    for (let i = 0; i < info.sampleSize; ++i) {
-                        baselineIters[i] = BigInt(sample.iters[i]);
-                        baselineTimes[i] = sample.times[i];
-                    }
-
-                    let flags = 0b1;
-                    const estimates: Estimates = JSON.parse(sfs.readFileSync(estimatesPath, { encoding: "utf-8" }));
-
-                    function setGlobals(name: string, estimate: Estimate) {
-                        (<WebAssembly.Global><unknown>exports[name + "LB"]).value = estimate.confidence_interval.lower_bound;
-                        (<WebAssembly.Global><unknown>exports[name + "HB"]).value = estimate.confidence_interval.upper_bound;
-                        (<WebAssembly.Global><unknown>exports[name + "Point"]).value = estimate.point_estimate;
-                        (<WebAssembly.Global><unknown>exports[name + "Error"]).value = estimate.standard_error;
-                    }
-
-                    setGlobals("mean", estimates.mean);
-                    setGlobals("median", estimates.median);
-                    setGlobals("MAD", estimates.median_abs_dev);
-                    setGlobals("stdDev", estimates.std_dev);
-
-                    if (estimates.slope) {
-                        flags = 0b11;
-                        setGlobals("slope", estimates.slope);
-                    }
-
-                    (<WebAssembly.Global><unknown>exports.flags).value = flags;
-                }
+                load();
             },
             start(estimatedMs: number, iterCount: number) {
                 console.log(
@@ -247,51 +206,36 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                 const hbs = formatTime(hb);
 
                 console.log(
-                    chalk`${header}time: [{gray ${lbs}} {bold ${times}} {gray ${hbs}}]`
+                    chalk`{green ${header}}time: [{gray ${lbs}} {bold ${times}} {gray ${hbs}}]`
                 );
+            },
 
-                // write to file
-                const memory = <WebAssembly.Memory><unknown>exports.memory;
-
-                const baselineIters = new BigUint64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineIters).value, info.sampleSize);
-                const baselineTimes = new Float64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineTimes).value, info.sampleSize);
-                const sample: Sample = {
-                    iters: [],
-                    times: []
+            change(lb: number, time: number, hb: number, pValue: number) {
+                // compare_to_threshold
+                const noise = info.noiseThreshold;
+                const sigThresh = info.significanceLevel;
+                console.log(lb, time, hb);
+                let times = formatChange(time);
+                let explanation = "Change within noise threshold.";
+                if (lb < -noise && hb < -noise) {
+                    // improved
+                    times = chalk.green(times);
+                    explanation = chalk`Performance has {green improved}.`;
+                } else if (lb > noise && hb > noise) {
+                    // regressed
+                    explanation = chalk`Performance has {green regressed}.`;
                 }
 
-                for (let i = 0; i < info.sampleSize; ++i) {
-                    sample.iters[i] = baselineIters[i].toString();
-                    sample.times[i] = baselineTimes[i];
-                }
+                const header = " ".repeat(24);
+                const lbs = formatChange(lb);
+                const hbs = formatChange(hb);
 
-                sfs.writeFileSync(path.join(baselineDir, currentBench, "sample.json"), JSON.stringify(sample));
-
-                function getEstimate(name: string): Estimate {
-                    return {
-                        confidence_interval: {
-                            confidence_level: info.confidenceLevel,
-                            lower_bound: (<WebAssembly.Global><unknown>exports[name + "LB"]).value,
-                            upper_bound: (<WebAssembly.Global><unknown>exports[name + "HB"]).value
-                        },
-                        point_estimate: (<WebAssembly.Global><unknown>exports[name + "Point"]).value,
-                        standard_error: (<WebAssembly.Global><unknown>exports[name + "Error"]).value
-                    };
-                }
-
-                const estimates: Estimates = {
-                    mean: getEstimate("mean"),
-                    median: getEstimate("median"),
-                    median_abs_dev: getEstimate("MAD"),
-                    std_dev: getEstimate("stdDev")
-                }
-
-                const flags = (<WebAssembly.Global><unknown>exports.flags).value;
-                if ((flags & 0b10) !== 0) {
-                    estimates.slope = getEstimate("slope");
-                }
-
-                sfs.writeFileSync(path.join(baselineDir, currentBench, "estimates.json"), JSON.stringify(estimates));
+                const differentMean = pValue < sigThresh;
+                const inequality = differentMean ? "<" : ">";
+                console.log(
+                    chalk`${header}change: [{gray ${lbs}} {bold ${times}} {gray ${hbs}}] (p = ${pValue} ${inequality} ${sigThresh})`
+                );
+                console.log(`${header}${explanation}`)
             },
             outliers(los: number, lom: number, him: number, his: number) {
                 const noutliers = los + lom + him + his;
@@ -322,6 +266,7 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                 print(lom, "low mild");
                 print(him, "high mild");
                 print(his, "high severe");
+                save();
             }
         },
         env: {
@@ -331,6 +276,96 @@ async function benchWASM(info: Info, binary: Uint8Array) {
             }
         }
     });
+
+    function load() {
+        sfs.mkdirSync(path.join(baselineDir, currentBench), { recursive: true });
+        const samplePath = path.join(baselineDir, currentBench, "sample.json");
+        const estimatesPath = path.join(baselineDir, currentBench, "estimates.json");
+        if (sfs.existsSync(samplePath) && sfs.existsSync(estimatesPath)) {
+            const memory = <WebAssembly.Memory><unknown>exports.memory;
+
+            const sample: Sample = JSON.parse(sfs.readFileSync(samplePath, { encoding: "utf-8" }));
+            const baselineIters = new Float64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineIters).value, info.sampleSize);
+            const baselineTimes = new Float64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineTimes).value, info.sampleSize);
+
+            if (info.sampleSize !== sample.iters?.length || info.sampleSize !== sample.times?.length) {
+                console.log("Warning: unsupported sample size mismatch"); // TODO?
+                return;
+            }
+
+            for (let i = 0; i < info.sampleSize; ++i) {
+                baselineIters[i] = sample.iters[i];
+                baselineTimes[i] = sample.times[i];
+            }
+
+            let flags = 0b1;
+            const estimates: Estimates = JSON.parse(sfs.readFileSync(estimatesPath, { encoding: "utf-8" }));
+
+            function setGlobals(name: string, estimate: Estimate) {
+                (<WebAssembly.Global><unknown>exports[name + "LB"]).value = estimate.confidence_interval.lower_bound;
+                (<WebAssembly.Global><unknown>exports[name + "HB"]).value = estimate.confidence_interval.upper_bound;
+                (<WebAssembly.Global><unknown>exports[name + "Point"]).value = estimate.point_estimate;
+                (<WebAssembly.Global><unknown>exports[name + "Error"]).value = estimate.standard_error;
+            }
+
+            setGlobals("mean", estimates.mean);
+            setGlobals("median", estimates.median);
+            setGlobals("MAD", estimates.median_abs_dev);
+            setGlobals("stdDev", estimates.std_dev);
+
+            if (estimates.slope) {
+                flags = 0b11;
+                setGlobals("slope", estimates.slope);
+            }
+
+            (<WebAssembly.Global><unknown>exports.flags).value = flags;
+        }
+    }
+
+    function save() {
+        // write to file
+        const memory = <WebAssembly.Memory><unknown>exports.memory;
+
+        const baselineIters = new Float64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineIters).value, info.sampleSize);
+        const baselineTimes = new Float64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineTimes).value, info.sampleSize);
+        const sample: Sample = {
+            iters: [],
+            times: []
+        }
+
+        for (let i = 0; i < info.sampleSize; ++i) {
+            sample.iters[i] = baselineIters[i];
+            sample.times[i] = baselineTimes[i];
+        }
+
+        sfs.writeFileSync(path.join(baselineDir, currentBench, "sample.json"), JSON.stringify(sample));
+
+        function getEstimate(name: string): Estimate {
+            return {
+                confidence_interval: {
+                    confidence_level: info.confidenceLevel,
+                    lower_bound: (<WebAssembly.Global><unknown>exports[name + "LB"]).value,
+                    upper_bound: (<WebAssembly.Global><unknown>exports[name + "HB"]).value
+                },
+                point_estimate: (<WebAssembly.Global><unknown>exports[name + "Point"]).value,
+                standard_error: (<WebAssembly.Global><unknown>exports[name + "Error"]).value
+            };
+        }
+
+        const estimates: Estimates = {
+            mean: getEstimate("mean"),
+            median: getEstimate("median"),
+            median_abs_dev: getEstimate("MAD"),
+            std_dev: getEstimate("stdDev")
+        }
+
+        const flags = (<WebAssembly.Global><unknown>exports.flags).value;
+        if ((flags & 0b10) !== 0) {
+            estimates.slope = getEstimate("slope");
+        }
+
+        sfs.writeFileSync(path.join(baselineDir, currentBench, "estimates.json"), JSON.stringify(estimates));
+    }
     (<Function>exports.benchmark)();
 }
 
@@ -378,6 +413,16 @@ function formatIterCount(i: number) {
     }
 }
 
+function formatChange(pct: number) {
+    if (pct > 0) {
+        return `+${short(pct)}%`;
+    } else if (pct === 0) {
+        return `0%`;
+    } else {
+        return `-${short(-pct)}%`;
+    }
+}
+
 interface ConfidenceInterval {
     confidence_level: number,
     lower_bound: number,
@@ -399,6 +444,6 @@ interface Estimates {
 }
 
 interface Sample {
-    iters: string[],
+    iters: number[],
     times: number[],
 }
