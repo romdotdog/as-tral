@@ -4,7 +4,8 @@
     "type": "module",
     "files": [
         "/as-tral.d.ts",
-        "/assembly",
+        "/assembly/*.ts",
+        "/assembly/tsconfig.json",
         "/dist"
     ],
     "scripts": {
