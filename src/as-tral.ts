@@ -214,7 +214,7 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                 // compare_to_threshold
                 const noise = info.noiseThreshold;
                 const sigThresh = info.significanceLevel;
-                console.log(lb, time, hb);
+
                 let times = formatChange(time);
                 let explanation = "Change within noise threshold.";
                 if (lb < -noise && hb < -noise) {
