@@ -69,6 +69,11 @@ class Astral extends Transform {
                         Node.createIdentifierExpression("bench", range),
                         null,
                         range
+                    ),
+                    Node.createImportDeclaration(
+                        Node.createIdentifierExpression("blackbox", range),
+                        null,
+                        range
                     )
                 ],
                 Node.createStringLiteralExpression("__astral__", range),
@@ -324,7 +329,7 @@ class Astral extends Transform {
             }
         }
 
-        parser.parseFile(lib, "~lib/__astral__.ts", false);
+        parser.parseFile(lib, "~lib/__astral__.ts", true);
         const src = parser.sources[parser.sources.length - 1]!;
 
         function createGlobal(name: keyof Settings, type: "f64" | "u32") {

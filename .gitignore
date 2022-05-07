@@ -1,5 +1,4 @@
 node_modules
 build
 dist
-assembly/**/*.wasm
-assembly/**/*.wat
+as-tral

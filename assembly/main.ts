@@ -169,6 +169,35 @@ export function blackbox<T>(x: T): T {
     return load<T>(blackboxArea);
 }
 
+export const baselineIters = memory.data(__astral__sampleSize * sizeof<u64>());
+export const baselineTimes = memory.data(__astral__sampleSize * sizeof<f64>());
+export let flags: u32 = 0;
+
+export let meanLB: f64 = 0;
+export let meanHB: f64 = 0;
+export let meanPoint: f64 = 0;
+export let meanError: f64 = 0;
+
+export let medianLB: f64 = 0;
+export let medianHB: f64 = 0;
+export let medianPoint: f64 = 0;
+export let medianError: f64 = 0;
+
+export let MADLB: f64 = 0;
+export let MADHB: f64 = 0;
+export let MADPoint: f64 = 0;
+export let MADError: f64 = 0;
+
+export let slopeLB: f64 = 0;
+export let slopeHB: f64 = 0;
+export let slopePoint: f64 = 0;
+export let slopeError: f64 = 0;
+
+export let stdDevLB: f64 = 0;
+export let stdDevHB: f64 = 0;
+export let stdDevPoint: f64 = 0;
+export let stdDevError: f64 = 0;
+
 export function bench(descriptor: u32, routine: () => void): void {
     // warmup
     let warmupIters: u64 = 1;
@@ -237,10 +266,10 @@ export function bench(descriptor: u32, routine: () => void): void {
 
     averageTimes.sort();
 
-    const pointMean = Stats.mean(averageTimes);
-    const pointStdDev = Stats.stdDev(averageTimes, pointMean);
-    const pointMedian = Stats.sorted.median(averageTimes);
-    const pointMAD = Stats.sorted.MAD(averageTimes, pointMedian);
+    meanPoint = Stats.mean(averageTimes);
+    stdDevPoint = Stats.stdDev(averageTimes, meanPoint);
+    medianPoint = Stats.sorted.median(averageTimes);
+    MADPoint = Stats.sorted.MAD(averageTimes, medianPoint);
 
     // bootstrapping
     const distMean = new StaticArray<f64>(__astral__numResamples);
@@ -272,27 +301,34 @@ export function bench(descriptor: u32, routine: () => void): void {
     distMAD.sort();
 
     // confidence interval
-    const meanLB = Stats.sorted.CI.LB(distMean);
-    const meanHB = Stats.sorted.CI.HB(distMean);
+    meanLB = Stats.sorted.CI.LB(distMean);
+    meanHB = Stats.sorted.CI.HB(distMean);
 
-    const stdDevLB = Stats.sorted.CI.LB(distStdDev);
-    const stdDevHB = Stats.sorted.CI.HB(distStdDev);
+    stdDevLB = Stats.sorted.CI.LB(distStdDev);
+    stdDevHB = Stats.sorted.CI.HB(distStdDev);
 
-    const medianLB = Stats.sorted.CI.LB(distMedian);
-    const medianHB = Stats.sorted.CI.HB(distMedian);
+    medianLB = Stats.sorted.CI.LB(distMedian);
+    medianHB = Stats.sorted.CI.HB(distMedian);
 
-    const MADLB = Stats.sorted.CI.LB(distMAD);
-    const MADHB = Stats.sorted.CI.HB(distMAD);
+    MADLB = Stats.sorted.CI.LB(distMAD);
+    MADHB = Stats.sorted.CI.HB(distMAD);
+
+
+    for (let i = 0; i < __astral__sampleSize; ++i) {
+        store<u64>(baselineIters + (<usize>i << alignof<u64>()), mIters[i]);
+        store<f64>(baselineTimes + (<usize>i << alignof<f64>()), times[i]);
+    }
 
     // regression
 
     if (!useFlatSampling) {
+        flags = 0b10;
         const mItersF = new StaticArray<f64>(__astral__sampleSize);
         for (let i = 0; i < __astral__sampleSize; ++i) {
             mItersF[i] = mIters[i] as f64;
         }
 
-        const pointFit = Regression.fit(mItersF, times);
+        slopePoint = Regression.fit(mItersF, times);
 
         // bivariate bootstrapping
         const resampleX = new StaticArray<f64>(__astral__sampleSize);
@@ -307,11 +343,12 @@ export function bench(descriptor: u32, routine: () => void): void {
         }
 
         distFit.sort();
-        const slopeLB = Stats.sorted.CI.LB(distFit);
-        const slopeHB = Stats.sorted.CI.HB(distFit);
-        result(slopeLB, pointFit, slopeHB);
+        slopeLB = Stats.sorted.CI.LB(distFit);
+        slopeHB = Stats.sorted.CI.HB(distFit);
+        result(slopeLB, slopePoint, slopeHB);
     } else {
-        result(meanLB, pointMean, meanHB);
+        flags = 0;
+        result(meanLB, meanPoint, meanHB);
     }
 
     const mild = 1.5;

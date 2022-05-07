@@ -6,8 +6,31 @@ import fs from "fs/promises";
 import glob from "fast-glob";
 import { exit } from "process";
 import chalk from "chalk";
+import escalade from "escalade";
 
 import asc from "assemblyscript/dist/asc.js";
+import { asFlags, flags } from "./CLI.js";
+
+const root = await escalade(".", (dir, names) => {
+    if (names.includes("assembly")) {
+        return dir;
+    }
+});
+
+if (typeof root !== "string") {
+    console.log("ERROR: could not find AssemblyScript `assembly` directory");
+    exit(1);
+}
+
+const astralDir = path.join(root, "as-tral")
+const defaultBaseline = sfs.existsSync(path.join(astralDir, "base")) ? "new" : "base";
+const baseline = flags.baseline ?? defaultBaseline;
+const baselineDir = path.join(astralDir, baseline)
+const saveBaseline = flags.saveBaseline ?? defaultBaseline;
+const saveBaselineDir = path.join(astralDir, saveBaseline);
+await fs.mkdir(saveBaselineDir, { recursive: true });
+
+// main
 
 const __dirname = new URL('.', import.meta.url).pathname;
 const decoder = new TextDecoder();
@@ -17,7 +40,7 @@ const folderMap = new Map<string, string[]>();
 
 let files;
 try {
-    files = await glob("assembly/__benches__/**/*.ts");
+    files = await glob(path.join(root, "assembly/__benches__/**/*.ts"));
 } catch (e: any) {
     console.log("ERROR: could not find directory " + e.path);
     exit(1);
@@ -28,13 +51,16 @@ for (const file of files) {
 }
 
 async function compileFile(file: string) {
-    const fileName = path.basename(file);
+    const fileName = path.basename(file, path.extname(file));
     console.log(`Compiling ${path.relative(".", file)}`);
 
     let binaryOrNull: Uint8Array | null = null;
     let infoOrNull: Info | null = null;
+
+    const ascFlags = [file, "--transform", path.join(__dirname, "transform.js"), "-o", fileName + ".wasm", "-t", fileName + ".wat", "--optimize", "--exportStart", "benchmark"];
+    Array.prototype.push.apply(ascFlags, asFlags);
     const { error } = await asc.main(
-        [file, "--transform", path.join(__dirname, "transform.js"), "-o", fileName + ".wasm", "-t", fileName + ".wat", "--optimize"],
+        ascFlags,
         {
             stdout: process.stdout,
             stderr: process.stderr,
@@ -53,8 +79,8 @@ async function compileFile(file: string) {
                 }
 
                 const outfileName = path.join(
-                    path.dirname(file),
-                    path.basename(file, path.extname(file)) + ext
+                    saveBaselineDir,
+                    fileName + ext
                 );
 
                 fs.writeFile(outfileName, contents);
@@ -92,7 +118,7 @@ async function compileFile(file: string) {
         }
     );
 
-    if (error) {
+    if (error !== null) {
         console.log("Errors found during compilation:");
         console.log(error);
         return;
@@ -118,7 +144,7 @@ async function compileFile(file: string) {
 
 async function benchWASM(info: Info, binary: Uint8Array) {
     let currentBench = "";
-    await WebAssembly.instantiate(binary, {
+    const { instance: { exports } } = await WebAssembly.instantiate(binary, {
         __astral__: {
             now: performance.now,
             warmup(descriptor: number) {
@@ -129,6 +155,49 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                         info.warmupTime
                     )}`
                 );
+
+                sfs.mkdirSync(path.join(baselineDir, currentBench), { recursive: true });
+                const samplePath = path.join(baselineDir, currentBench, "sample.json");
+                const estimatesPath = path.join(baselineDir, currentBench, "estimates.json");
+                if (sfs.existsSync(samplePath) && sfs.existsSync(estimatesPath)) {
+                    const memory = <WebAssembly.Memory><unknown>exports.memory;
+
+                    const sample: Sample = JSON.parse(sfs.readFileSync(samplePath, { encoding: "utf-8" }));
+                    const baselineIters = new BigUint64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineIters).value, info.sampleSize);
+                    const baselineTimes = new Float64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineTimes).value, info.sampleSize);
+
+                    if (info.sampleSize !== sample.iters?.length || info.sampleSize !== sample.times?.length) {
+                        console.log("Warning: unsupported sample size mismatch"); // TODO?
+                        return;
+                    }
+
+                    for (let i = 0; i < info.sampleSize; ++i) {
+                        baselineIters[i] = BigInt(sample.iters[i]);
+                        baselineTimes[i] = sample.times[i];
+                    }
+
+                    let flags = 0b1;
+                    const estimates: Estimates = JSON.parse(sfs.readFileSync(estimatesPath, { encoding: "utf-8" }));
+
+                    function setGlobals(name: string, estimate: Estimate) {
+                        (<WebAssembly.Global><unknown>exports[name + "LB"]).value = estimate.confidence_interval.lower_bound;
+                        (<WebAssembly.Global><unknown>exports[name + "HB"]).value = estimate.confidence_interval.upper_bound;
+                        (<WebAssembly.Global><unknown>exports[name + "Point"]).value = estimate.point_estimate;
+                        (<WebAssembly.Global><unknown>exports[name + "Error"]).value = estimate.standard_error;
+                    }
+
+                    setGlobals("mean", estimates.mean);
+                    setGlobals("median", estimates.median);
+                    setGlobals("MAD", estimates.median_abs_dev);
+                    setGlobals("stdDev", estimates.std_dev);
+
+                    if (estimates.slope) {
+                        flags = 0b11;
+                        setGlobals("slope", estimates.slope);
+                    }
+
+                    (<WebAssembly.Global><unknown>exports.flags).value = flags;
+                }
             },
             start(estimatedMs: number, iterCount: number) {
                 console.log(
@@ -180,6 +249,49 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                 console.log(
                     chalk`${header}time: [{gray ${lbs}} {bold ${times}} {gray ${hbs}}]`
                 );
+
+                // write to file
+                const memory = <WebAssembly.Memory><unknown>exports.memory;
+
+                const baselineIters = new BigUint64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineIters).value, info.sampleSize);
+                const baselineTimes = new Float64Array(memory.buffer, (<WebAssembly.Global><unknown>exports.baselineTimes).value, info.sampleSize);
+                const sample: Sample = {
+                    iters: [],
+                    times: []
+                }
+
+                for (let i = 0; i < info.sampleSize; ++i) {
+                    sample.iters[i] = baselineIters[i].toString();
+                    sample.times[i] = baselineTimes[i];
+                }
+
+                sfs.writeFileSync(path.join(baselineDir, currentBench, "sample.json"), JSON.stringify(sample));
+
+                function getEstimate(name: string): Estimate {
+                    return {
+                        confidence_interval: {
+                            confidence_level: info.confidenceLevel,
+                            lower_bound: (<WebAssembly.Global><unknown>exports[name + "LB"]).value,
+                            upper_bound: (<WebAssembly.Global><unknown>exports[name + "HB"]).value
+                        },
+                        point_estimate: (<WebAssembly.Global><unknown>exports[name + "Point"]).value,
+                        standard_error: (<WebAssembly.Global><unknown>exports[name + "Error"]).value
+                    };
+                }
+
+                const estimates: Estimates = {
+                    mean: getEstimate("mean"),
+                    median: getEstimate("median"),
+                    median_abs_dev: getEstimate("MAD"),
+                    std_dev: getEstimate("stdDev")
+                }
+
+                const flags = (<WebAssembly.Global><unknown>exports.flags).value;
+                if ((flags & 0b10) !== 0) {
+                    estimates.slope = getEstimate("slope");
+                }
+
+                sfs.writeFileSync(path.join(baselineDir, currentBench, "estimates.json"), JSON.stringify(estimates));
             },
             outliers(los: number, lom: number, him: number, his: number) {
                 const noutliers = los + lom + him + his;
@@ -219,6 +331,7 @@ async function benchWASM(info: Info, binary: Uint8Array) {
             }
         }
     });
+    (<Function>exports.benchmark)();
 }
 
 function short(n: number): string {
@@ -263,4 +376,29 @@ function formatIterCount(i: number) {
     } else {
         return `${~~(i / 1e9)}B iterations`;
     }
+}
+
+interface ConfidenceInterval {
+    confidence_level: number,
+    lower_bound: number,
+    upper_bound: number,
+}
+
+interface Estimate {
+    confidence_interval: ConfidenceInterval,
+    point_estimate: number,
+    standard_error: number,
+}
+
+interface Estimates {
+    mean: Estimate,
+    median: Estimate,
+    median_abs_dev: Estimate,
+    slope?: Estimate,
+    std_dev: Estimate,
+}
+
+interface Sample {
+    iters: string[],
+    times: number[],
 }
