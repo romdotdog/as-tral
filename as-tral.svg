@@ -15,7 +15,7 @@
         }
 
         #anim {
-            animation: anim infinite linear 6s; 
+            animation: anim infinite linear 60s; 
         }
     </style>
     <defs>  
