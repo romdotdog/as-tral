@@ -233,7 +233,7 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                 const differentMean = pValue < sigThresh;
                 const inequality = differentMean ? "<" : ">";
                 console.log(
-                    chalk`${header}change: [{gray ${lbs}} {bold ${times}} {gray ${hbs}}] (p = ${pValue} ${inequality} ${sigThresh})`
+                    chalk`${header}change: [{gray ${lbs}} {bold ${times}} {gray ${hbs}}] (p = ${pValue.toFixed(2)} ${inequality} ${sigThresh.toFixed(2)})`
                 );
                 console.log(`${header}${explanation}`)
             },
@@ -415,11 +415,11 @@ function formatIterCount(i: number) {
 
 function formatChange(pct: number) {
     if (pct > 0) {
-        return `+${short(pct)}%`;
+        return `+${short(pct * 100)}%`;
     } else if (pct === 0) {
         return `0%`;
     } else {
-        return `-${short(-pct)}%`;
+        return `-${short(pct * -100)}%`;
     }
 }
 
