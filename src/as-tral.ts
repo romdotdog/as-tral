@@ -223,7 +223,7 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                     explanation = chalk`Performance has {green improved}.`;
                 } else if (lb > noise && hb > noise) {
                     // regressed
-                    explanation = chalk`Performance has {green regressed}.`;
+                    explanation = chalk`Performance has {red regressed}.`;
                 }
 
                 const header = " ".repeat(24);
