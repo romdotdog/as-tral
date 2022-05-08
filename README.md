@@ -3,13 +3,13 @@
 </p>
 
 ---
-Bringing minimalist, state-of-the-art benchmarking to AssemblyScript; as-tral is a port of the statistics-oriented rust benchmarking library [criterion.rs.](https://github.com/bheisler/criterion.rs)
+Bringing minimalist, state-of-the-art benchmarking to AssemblyScript; as-tral is a port of the statistics-oriented Rust benchmarking library [criterion.rs.](https://github.com/bheisler/criterion.rs)
 
 ## Quickstart
 
 In an existing [AssemblyScript project,](https://www.assemblyscript.org/getting-started.html) install as-tral.
 ```
-npm install -D @as-tral/cli
+npm i -D @as-tral/cli
 ```
 
 Next, create a `__benches__` folder in your `assembly` directory. Add a file named `as-tral.d.ts` in there.
@@ -37,6 +37,7 @@ Your benchmark will live in this file. Let's create an example benchmark.
 const input = blackbox("The quick brown fox jumped over the lazy dog.".repeat(10));
 
 // our string here must be a compile time constant.
+// open an issue if you'd like to see this constraint lifted.
 bench("string split", () => {
     // this function body will be run many times.
     // we must make sure our compiler won't throw away the computation,
@@ -45,7 +46,7 @@ bench("string split", () => {
 });
 ```
 Now, let's run as-tral.
-```console
+```
 rom@i9-cabin:~/demo$ npx astral
 Compiling assembly/__benches__/hello.ts
 
