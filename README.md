@@ -20,7 +20,7 @@ assembly/
 ```
 In `as-tral.d.ts`, copy and paste
 ```xml
-/// <reference path="../node_modules/@as-tral/cli/as-tral.d.ts" />
+/// <reference path="../../node_modules/@as-tral/cli/as-tral.d.ts" />
 ```
 
 Stick any file with a `.ts` extension in  `__benches__`. You can even have multiple.
