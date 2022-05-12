@@ -40,7 +40,8 @@ const folderMap = new Map<string, string[]>();
 
 let files;
 try {
-    files = await glob(path.join(root, "assembly/__benches__/**/*.ts"));
+    const globPattern = path.join(root, "assembly", "__benches__", "**", "*.ts").replace(/\\/g, '/'); // may be a hack?
+    files = await glob(globPattern);
 } catch (e: any) {
     console.log("ERROR: could not find directory " + e.path);
     exit(1);
