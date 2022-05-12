@@ -4,6 +4,7 @@ import path from "path";
 import sfs from "fs";
 import fs from "fs/promises";
 import glob from "fast-glob";
+import { fileURLToPath } from "url";
 import { exit } from "process";
 import chalk from "chalk";
 import escalade from "escalade";
@@ -22,7 +23,7 @@ if (typeof root !== "string") {
     exit(1);
 }
 
-const astralDir = path.join(root, "as-tral")
+const astralDir = path.join(root, "as-tral");
 const defaultBaseline = sfs.existsSync(path.join(astralDir, "base")) ? "new" : "base";
 const baseline = flags.baseline ?? defaultBaseline;
 const baselineDir = path.join(astralDir, baseline)
@@ -32,7 +33,7 @@ await fs.mkdir(saveBaselineDir, { recursive: true });
 
 // main
 
-const __dirname = new URL('.', import.meta.url).pathname;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const decoder = new TextDecoder();
 
 const fileMap = new Map<string, string>();

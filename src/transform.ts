@@ -17,7 +17,8 @@ import {
     Expression
 } from "assemblyscript/dist/assemblyscript.js";
 
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { readFileSync } from "fs";
 
 // sort of a hack to get globals exported
@@ -52,7 +53,7 @@ const reexport = [
     "stdDevError",
 ];
 
-const __dirname = new URL('.', import.meta.url).pathname;
+const __dirname = dirname(fileURLToPath(import.meta.url));;
 const lib = readFileSync(join(__dirname, "../assembly/main.ts"), {
     encoding: "utf8"
 });
