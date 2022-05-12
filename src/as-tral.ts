@@ -46,6 +46,11 @@ try {
     exit(1);
 }
 
+if (files.length == 0) {
+    console.log("ERROR: no files found");
+    exit(1);
+}
+
 for (const file of files) {
     if (file.endsWith(".d.ts")) {
         continue;
