@@ -47,6 +47,9 @@ try {
 }
 
 for (const file of files) {
+    if (file.endsWith(".d.ts")) {
+        continue;
+    }
     compileFile(file);
 }
 
