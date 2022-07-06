@@ -53,7 +53,7 @@ const reexport = [
     "stdDevError",
 ];
 
-const __dirname = dirname(fileURLToPath(import.meta.url));;
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const lib = readFileSync(join(__dirname, "../assembly/main.ts"), {
     encoding: "utf8"
 });
