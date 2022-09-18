@@ -8,9 +8,8 @@ import { fileURLToPath } from "url";
 import { exit } from "process";
 import chalk from "chalk";
 import escalade from "escalade";
-
-import asc from "assemblyscript/dist/asc.js";
 import { asFlags, flags } from "./CLI.js";
+import type ASC from "assemblyscript/dist/asc"
 
 const root = await escalade(".", (dir, names) => {
     if (names.includes("assembly")) {
@@ -21,6 +20,13 @@ const root = await escalade(".", (dir, names) => {
 if (typeof root !== "string") {
     console.log("ERROR: could not find AssemblyScript `assembly` directory");
     exit(1);
+}
+
+let asc: typeof ASC;
+try {
+    asc = await import(path.join(root, "node_modules", "assemblyscript", "dist", "asc.js"))
+} catch {
+    console.log("ERROR: could not find node_modules/assemblyscript/dist/asc.js");
 }
 
 const astralDir = path.join(root, "as-tral");
