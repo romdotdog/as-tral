@@ -59,12 +59,12 @@ const lib = readFileSync(join(__dirname, "../assembly/main.ts"), {
 });
 
 function readNumberOrFloat(node: Node): number | null {
-    if (node.kind == NodeKind.LITERAL) {
+    if (node.kind == NodeKind.Literal) {
         const literal = <LiteralExpression>node;
         switch (literal.literalKind) {
-            case LiteralKind.FLOAT:
+            case LiteralKind.Float:
                 return (<FloatLiteralExpression>literal).value;
-            case LiteralKind.INTEGER: {
+            case LiteralKind.Integer: {
                 const val = (<IntegerLiteralExpression>literal).value;
                 return i64_low(val);
             }
@@ -74,7 +74,7 @@ function readNumberOrFloat(node: Node): number | null {
 }
 
 function readString(node: Node): string | null {
-    return node.isLiteralKind(LiteralKind.STRING)
+    return node.isLiteralKind(LiteralKind.String)
         ? (<StringLiteralExpression>node).value
         : null;
 }
@@ -127,11 +127,11 @@ class Astral extends Transform {
             src.statements.unshift(imp, exp);
             for (let i = 0; i < src.statements.length; i++) {
                 const stmt = src.statements[i];
-                if (stmt.kind == NodeKind.EXPRESSION) {
+                if (stmt.kind == NodeKind.Expression) {
                     const expr = (<ExpressionStatement>stmt).expression;
-                    if (expr.kind == NodeKind.CALL) {
+                    if (expr.kind == NodeKind.Call) {
                         const call = <CallExpression>expr;
-                        if (call.expression.kind != NodeKind.IDENTIFIER) continue;
+                        if (call.expression.kind != NodeKind.Identifier) continue;
 
                         const functionName = (<IdentifierExpression>call.expression).text;
 
@@ -141,9 +141,9 @@ class Astral extends Transform {
                                 const settings = call.args[0];
 
                                 if (
-                                    settings.kind != NodeKind.LITERAL ||
+                                    settings.kind != NodeKind.Literal ||
                                     (<LiteralExpression>settings).literalKind !=
-                                    LiteralKind.OBJECT
+                                    LiteralKind.Object
                                 )
                                     continue;
 
@@ -354,8 +354,8 @@ class Astral extends Transform {
                                 const string = call.args[0];
 
                                 if (
-                                    string.kind != NodeKind.LITERAL ||
-                                    (<LiteralExpression>string).literalKind != LiteralKind.STRING
+                                    string.kind != NodeKind.Literal ||
+                                    (<LiteralExpression>string).literalKind != LiteralKind.String
                                 )
                                     continue;
 
@@ -390,7 +390,7 @@ class Astral extends Transform {
             return Node.createVariableDeclaration(
                 Node.createIdentifierExpression("__astral__" + name, src.range),
                 null,
-                CommonFlags.CONST,
+                CommonFlags.Const,
                 null,
                 expr,
                 src.range
