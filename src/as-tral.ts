@@ -162,7 +162,7 @@ async function benchWASM(info: Info, binary: Uint8Array) {
     let currentBench = "";
     const { instance: { exports } } = await WebAssembly.instantiate(binary, {
         __astral__: {
-            now: performance.now,
+            now: () => performance.now(),
             warmup(descriptor: number) {
                 currentBench = info.enumeration[descriptor];
                 console.log();
