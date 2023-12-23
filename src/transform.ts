@@ -149,201 +149,7 @@ class Astral extends Transform {
 
                                 const settingsObject = <ObjectLiteralExpression>settings;
                                 for (let i = 0, l = settingsObject.names.length; i < l; ++i) {
-                                    // https://github.com/bheisler/criterion.rs/blob/970aa04aa5ee0514d1930c83a58c6ca994727567/src/lib.rs#L504
-                                    switch (settingsObject.names[i].text) {
-                                        // TODO: refactor?
-                                        case "warmupTime": {
-                                            const val = settingsObject.values[i];
-                                            const num = readNumberOrFloat(val);
-                                            if (num === null) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "this warmupTime is invalid."
-                                                );
-                                                continue;
-                                            } else if (num <= 0) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "warmupTime must be greater than 0."
-                                                );
-                                                continue;
-                                            }
-                                            info.warmupTime = num;
-                                            break;
-                                        }
-                                        case "measurementTime": {
-                                            const val = settingsObject.values[i];
-                                            const num = readNumberOrFloat(val);
-                                            if (num === null) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "this measurementTime is invalid."
-                                                );
-                                                continue;
-                                            } else if (num <= 0) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "measurementTime must be greater than 0."
-                                                );
-                                                continue;
-                                            }
-                                            info.measurementTime = num;
-                                            break;
-                                        }
-                                        case "sampleSize": {
-                                            const val = settingsObject.values[i];
-                                            const num = readNumberOrFloat(val);
-                                            if (num === null) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "this sampleSize is invalid."
-                                                );
-                                                continue;
-                                            } else if (num < 10) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "sampleSize must be at least 10."
-                                                );
-                                                continue;
-                                            }
-                                            info.sampleSize = num;
-                                            break;
-                                        }
-                                        case "numResamples": {
-                                            const val = settingsObject.values[i];
-                                            const num = readNumberOrFloat(val);
-                                            if (num === null) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "this numResamples is invalid."
-                                                );
-                                                continue;
-                                            } else if (num < 1000) {
-                                                parser.warning(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "Setting numResamples below 1000 is not recommended."
-                                                );
-                                                continue;
-                                            }
-                                            info.numResamples = num;
-                                            break;
-                                        }
-                                        case "samplingMode": {
-                                            const val = settingsObject.values[i];
-                                            const mode = readString(val);
-                                            switch (mode) {
-                                                case "auto":
-                                                    info.samplingMode = 0;
-                                                    break;
-                                                case "linear":
-                                                    info.samplingMode = 1;
-                                                    break;
-                                                case "flat":
-                                                    info.samplingMode = 2;
-                                                    break;
-                                                default:
-                                                    parser.error(
-                                                        DiagnosticCode.Transform_0_1,
-                                                        val.range,
-                                                        "as-tral",
-                                                        "this samplingMode is invalid."
-                                                    );
-                                            }
-                                            break;
-                                        }
-                                        case "confidenceLevel": {
-                                            const val = settingsObject.values[i];
-                                            const num = readNumberOrFloat(val);
-                                            if (num === null) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "this confidenceLevel is invalid."
-                                                );
-                                                continue;
-                                            } else if (num <= 0 || num >= 1) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "confidenceLevel must be between 0 and 1."
-                                                );
-                                                continue;
-                                            } else if (num < 0.5) {
-                                                parser.warning(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "Setting confidenceLevel below 0.5 is not recommended."
-                                                );
-                                            }
-                                            info.confidenceLevel = num;
-                                            break;
-                                        }
-                                        case "significanceLevel": {
-                                            const val = settingsObject.values[i];
-                                            const num = readNumberOrFloat(val);
-                                            if (num === null) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "this significanceLevel is invalid."
-                                                );
-                                                continue;
-                                            } else if (num <= 0 || num >= 1) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "significanceLevel must be between 0 and 1."
-                                                );
-                                                continue;
-                                            }
-                                            info.significanceLevel = num;
-                                            break;
-                                        }
-                                        case "noiseThreshold": {
-                                            const val = settingsObject.values[i];
-                                            const num = readNumberOrFloat(val);
-                                            if (num === null) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "this noiseThreshold is invalid."
-                                                );
-                                                continue;
-                                            } else if (num < 0) {
-                                                parser.error(
-                                                    DiagnosticCode.Transform_0_1,
-                                                    val.range,
-                                                    "as-tral",
-                                                    "noiseThreshold must be at least 0."
-                                                );
-                                                continue;
-                                            }
-                                            info.noiseThreshold = num;
-                                            break;
-                                        }
-                                    }
+                                    parseSetting(parser, info, settingsObject.names[i], settingsObject.values[i]);
                                 }
 
                                 src.statements.splice(i--, 1);
@@ -416,6 +222,204 @@ class Astral extends Transform {
 
         this.writeFile("__astralinfo__", encoder.encode(JSON.stringify(info)), ".");
     }
+}
+
+// https://github.com/bheisler/criterion.rs/blob/970aa04aa5ee0514d1930c83a58c6ca994727567/src/lib.rs#L504
+function parseSetting(parser: Parser, info: Info, ident: IdentifierExpression, val: Node): boolean {
+    const name = ident.text;
+    switch (name) {
+        case "warmupTime": {
+            const num = readNumberOrFloat(val);
+            if (num === null) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "this warmupTime is invalid."
+                );
+                return false;
+            } else if (num <= 0) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "warmupTime must be greater than 0."
+                );
+                return false;
+            }
+            info.warmupTime = num;
+            return true;
+        }
+        case "measurementTime": {
+            const num = readNumberOrFloat(val);
+            if (num === null) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "this measurementTime is invalid."
+                );
+                return false;
+            } else if (num <= 0) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "measurementTime must be greater than 0."
+                );
+                return false;
+            }
+            info.measurementTime = num;
+            return true;
+        }
+        case "sampleSize": {
+            const num = readNumberOrFloat(val);
+            if (num === null) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "this sampleSize is invalid."
+                );
+                return false;
+            } else if (num < 10) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "sampleSize must be at least 10."
+                );
+                return false;
+            }
+            info.sampleSize = num;
+            return true;
+        }
+        case "numResamples": {
+            const num = readNumberOrFloat(val);
+            if (num === null) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "this numResamples is invalid."
+                );
+                return false;
+            } else if (num < 1000) {
+                parser.warning(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "Setting numResamples below 1000 is not recommended."
+                );
+                return false;
+            }
+            info.numResamples = num;
+            return true;
+        }
+        case "samplingMode": {
+            const mode = readString(val);
+            switch (mode) {
+                case "auto":
+                    info.samplingMode = 0;
+                    return true;
+                case "linear":
+                    info.samplingMode = 1;
+                    return true;
+                case "flat":
+                    info.samplingMode = 2;
+                    return true;
+                default:
+                    parser.error(
+                        DiagnosticCode.Transform_0_1,
+                        val.range,
+                        "as-tral",
+                        "this samplingMode is invalid."
+                    );
+            }
+            return true;
+        }
+        case "confidenceLevel": {
+            const num = readNumberOrFloat(val);
+            if (num === null) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "this confidenceLevel is invalid."
+                );
+                return false;
+            } else if (num <= 0 || num >= 1) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "confidenceLevel must be between 0 and 1."
+                );
+                return false;
+            } else if (num < 0.5) {
+                parser.warning(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "Setting confidenceLevel below 0.5 is not recommended."
+                );
+            }
+            info.confidenceLevel = num;
+            return true;
+        }
+        case "significanceLevel": {
+            const num = readNumberOrFloat(val);
+            if (num === null) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "this significanceLevel is invalid."
+                );
+                return false;
+            } else if (num <= 0 || num >= 1) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "significanceLevel must be between 0 and 1."
+                );
+                return false;
+            }
+            info.significanceLevel = num;
+            return true;
+        }
+        case "noiseThreshold": {
+            const num = readNumberOrFloat(val);
+            if (num === null) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "this noiseThreshold is invalid."
+                );
+                return false;
+            } else if (num < 0) {
+                parser.error(
+                    DiagnosticCode.Transform_0_1,
+                    val.range,
+                    "as-tral",
+                    "noiseThreshold must be at least 0."
+                );
+                return false;
+            }
+            info.noiseThreshold = num;
+            return true;
+        }
+    }
+
+    parser.error(
+        DiagnosticCode.Transform_0_1,
+        ident.range,
+        "as-tral",
+        `${name} is not a valid setting.`
+    );
+    return false;
 }
 
 export default Astral;
