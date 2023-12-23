@@ -1,10 +1,22 @@
 class Matrix4 {
     public elements: Float32Array = new Float32Array(16);
     constructor(
-        m00: f32, m01: f32, m02: f32, m03: f32,
-        m10: f32, m11: f32, m12: f32, m13: f32,
-        m20: f32, m21: f32, m22: f32, m23: f32,
-        m30: f32, m31: f32, m32: f32, m33: f32,
+        m00: f32,
+        m01: f32,
+        m02: f32,
+        m03: f32,
+        m10: f32,
+        m11: f32,
+        m12: f32,
+        m13: f32,
+        m20: f32,
+        m21: f32,
+        m22: f32,
+        m23: f32,
+        m30: f32,
+        m31: f32,
+        m32: f32,
+        m33: f32
     ) {
         const te = this.elements;
         unchecked((te[0] = m00));
@@ -52,7 +64,7 @@ class Matrix4 {
     }
 
     multiplyScalarSIMD(s: f32): Matrix4 {
-        const te = this.elements.dataStart;  // Float32Array
+        const te = this.elements.dataStart; // Float32Array
         const scalar = f32x4.splat(s);
         const a0 = f32x4.mul(v128.load(te, 0), scalar);
         const a1 = f32x4.mul(v128.load(te, 16), scalar);
@@ -66,16 +78,29 @@ class Matrix4 {
     }
 }
 
-
 const _matrices: Matrix4[] = [];
 
 for (let i = 0; i < 100; ++i) {
-    _matrices.push(new Matrix4(
-        (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32,
-        (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32,
-        (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32,
-        (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32, (Math.random() * 100 - 50) as f32
-    ));
+    _matrices.push(
+        new Matrix4(
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32,
+            (Math.random() * 100 - 50) as f32
+        )
+    );
 }
 
 bench("mat4", () => {
@@ -83,7 +108,7 @@ bench("mat4", () => {
         const m = unchecked(_matrices[i]);
         m.multiplyScalar(5);
     }
-})
+});
 
 const numMatrices = _matrices.length;
 bench("simd mat4", () => {
@@ -91,4 +116,4 @@ bench("simd mat4", () => {
         const m = unchecked(_matrices[i]);
         m.multiplyScalarSIMD(5);
     }
-})
+});

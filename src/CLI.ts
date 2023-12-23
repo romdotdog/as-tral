@@ -1,8 +1,8 @@
 import { argv, exit } from "process";
 
 interface Flags {
-    baseline?: string,
-    saveBaseline?: string
+    baseline?: string;
+    saveBaseline?: string;
 }
 
 enum State {
@@ -14,7 +14,7 @@ enum State {
 const transition = new Map([
     ["--baseline", State.Baseline],
     ["--save-baseline", State.SaveBaseline]
-])
+]);
 
 let i = 2;
 for (; i < argv.length; ++i) {
@@ -24,7 +24,7 @@ for (; i < argv.length; ++i) {
 }
 
 const asFlags = argv.slice(2, i);
-const flags: Flags = {}
+const flags: Flags = {};
 
 let state = State.Default;
 main: while (true) {

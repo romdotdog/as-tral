@@ -1,8 +1,4 @@
 {
     "extends": "assemblyscript/std/assembly.json",
-    "include": [
-        "./**/*.ts",
-        "settings.d.ts",
-        "../as-tral.d.ts"
-    ]
+    "include": ["./**/*.ts", "settings.d.ts", "../as-tral.d.ts"]
 }

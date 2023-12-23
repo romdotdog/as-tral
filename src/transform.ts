@@ -50,7 +50,7 @@ const reexport = [
     "stdDevLB",
     "stdDevHB",
     "stdDevPoint",
-    "stdDevError",
+    "stdDevError"
 ];
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -107,18 +107,20 @@ class Astral extends Transform {
                         Node.createIdentifierExpression("blackbox", range),
                         null,
                         range
-                    ),
+                    )
                 ],
                 Node.createStringLiteralExpression("__astral__", range),
                 range
             );
 
             const exp = Node.createExportStatement(
-                reexport.map(v => Node.createExportMember(
-                    Node.createIdentifierExpression(v, range),
-                    null,
-                    range
-                )),
+                reexport.map(v =>
+                    Node.createExportMember(
+                        Node.createIdentifierExpression(v, range),
+                        null,
+                        range
+                    )
+                ),
                 Node.createStringLiteralExpression("__astral__", range),
                 false,
                 range
@@ -131,9 +133,12 @@ class Astral extends Transform {
                     const expr = (<ExpressionStatement>stmt).expression;
                     if (expr.kind == NodeKind.Call) {
                         const call = <CallExpression>expr;
-                        if (call.expression.kind != NodeKind.Identifier) continue;
+                        if (call.expression.kind != NodeKind.Identifier)
+                            continue;
 
-                        const functionName = (<IdentifierExpression>call.expression).text;
+                        const functionName = (<IdentifierExpression>(
+                            call.expression
+                        )).text;
 
                         switch (functionName) {
                             case "set": {
@@ -143,13 +148,24 @@ class Astral extends Transform {
                                 if (
                                     settings.kind != NodeKind.Literal ||
                                     (<LiteralExpression>settings).literalKind !=
-                                    LiteralKind.Object
+                                        LiteralKind.Object
                                 )
                                     continue;
 
-                                const settingsObject = <ObjectLiteralExpression>settings;
-                                for (let i = 0, l = settingsObject.names.length; i < l; ++i) {
-                                    parseSetting(parser, info, settingsObject.names[i], settingsObject.values[i]);
+                                const settingsObject = <
+                                    ObjectLiteralExpression
+                                >settings;
+                                for (
+                                    let i = 0, l = settingsObject.names.length;
+                                    i < l;
+                                    ++i
+                                ) {
+                                    parseSetting(
+                                        parser,
+                                        info,
+                                        settingsObject.names[i],
+                                        settingsObject.values[i]
+                                    );
                                 }
 
                                 src.statements.splice(i--, 1);
@@ -161,16 +177,20 @@ class Astral extends Transform {
 
                                 if (
                                     string.kind != NodeKind.Literal ||
-                                    (<LiteralExpression>string).literalKind != LiteralKind.String
+                                    (<LiteralExpression>string).literalKind !=
+                                        LiteralKind.String
                                 )
                                     continue;
 
-                                call.args[0] = Node.createIntegerLiteralExpression(
-                                    i64_new(info.enumeration.length),
-                                    string.range
-                                );
+                                call.args[0] =
+                                    Node.createIntegerLiteralExpression(
+                                        i64_new(info.enumeration.length),
+                                        string.range
+                                    );
 
-                                info.enumeration.push((<StringLiteralExpression>string).value);
+                                info.enumeration.push(
+                                    (<StringLiteralExpression>string).value
+                                );
                                 break;
                             }
                         }
@@ -220,12 +240,21 @@ class Astral extends Transform {
             )
         );
 
-        this.writeFile("__astralinfo__", encoder.encode(JSON.stringify(info)), ".");
+        this.writeFile(
+            "__astralinfo__",
+            encoder.encode(JSON.stringify(info)),
+            "."
+        );
     }
 }
 
 // https://github.com/bheisler/criterion.rs/blob/970aa04aa5ee0514d1930c83a58c6ca994727567/src/lib.rs#L504
-function parseSetting(parser: Parser, info: Info, ident: IdentifierExpression, val: Node): boolean {
+function parseSetting(
+    parser: Parser,
+    info: Info,
+    ident: IdentifierExpression,
+    val: Node
+): boolean {
     const name = ident.text;
     switch (name) {
         case "warmupTime": {
