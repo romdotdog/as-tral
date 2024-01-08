@@ -2,11 +2,7 @@ declare function now(): f64;
 declare function warmup(descriptor: u32): void;
 declare function start(estimatedMs: f64, iterCount: f64): void;
 declare function analyzing(): void;
-declare function faultyConfig(
-    linear: i32,
-    actualTime: f64,
-    recommendedSampleSize: f64
-): void;
+declare function faultyConfig(linear: i32, actualTime: f64, recommendedSampleSize: f64): void;
 declare function faultyBenchmark(): void;
 declare function result(timeLB: f64, time: f64, timeHB: f64): void;
 declare function change(timeLB: f64, time: f64, timeHB: f64, pValue: f64): void;
@@ -45,14 +41,12 @@ namespace Sampling {
 
     export function flatSampling(met: f64): StaticArray<u64> {
         const sampleCount = __astral__sampleSize;
-        const msPerSample =
-            (__astral__measurementTime as f64) / (sampleCount as f64);
+        const msPerSample = (__astral__measurementTime as f64) / (sampleCount as f64);
         // provisional
         const iterationsPerSample = max(1, ceil(msPerSample / met) as u64);
 
         if (iterationsPerSample == 1) {
-            const expectedMs =
-                ((iterationsPerSample * sampleCount) as f64) * met;
+            const expectedMs = ((iterationsPerSample * sampleCount) as f64) * met;
             faultyConfig(0, expectedMs, recommendFlatSampleSize(met));
         }
 
@@ -245,13 +239,9 @@ export function bench(descriptor: u32, routine: () => void): void {
 
     const met = warmupElapsedTime / (totalWarmupIters as f64);
     const useFlatSampling =
-        __astral__samplingMode == 0
-            ? Sampling.chooseSamplingMode(met)
-            : __astral__samplingMode == 2;
+        __astral__samplingMode == 0 ? Sampling.chooseSamplingMode(met) : __astral__samplingMode == 2;
 
-    const mIters = useFlatSampling
-        ? Sampling.flatSampling(met)
-        : Sampling.linearSampling(met);
+    const mIters = useFlatSampling ? Sampling.flatSampling(met) : Sampling.linearSampling(met);
 
     let expectedMs: f64 = 0;
     let totalIters: f64 = 0;
@@ -316,56 +306,41 @@ export function bench(descriptor: u32, routine: () => void): void {
         tDist = new StaticArray<f64>(__astral__numResamples);
         for (let i = 0; i < __astral__numResamples; ++i) {
             for (let j = 0; j < __astral__sampleSize; ++j) {
-                resampleX[j] =
-                    sample[(Math.random() * __astral__sampleSize * 2) as u32];
-                resampleY[j] =
-                    sample[(Math.random() * __astral__sampleSize * 2) as u32];
+                resampleX[j] = sample[(Math.random() * __astral__sampleSize * 2) as u32];
+                resampleY[j] = sample[(Math.random() * __astral__sampleSize * 2) as u32];
             }
             tDist[i] = Stats.t(resampleX, resampleY);
             // filter out non-finite numbers?
         }
 
         // estimate change (analysis/compare.rs > estimates)
-        meanChangePoint =
-            Stats.mean(averageTimes) / Stats.mean(baseAvgTimes) - 1.0;
+        meanChangePoint = Stats.mean(averageTimes) / Stats.mean(baseAvgTimes) - 1.0;
 
         baseAvgTimes.sort();
-        medianChangePoint =
-            Stats.sorted.median(averageTimes) /
-                Stats.sorted.median(baseAvgTimes) -
-            1.0;
+        medianChangePoint = Stats.sorted.median(averageTimes) / Stats.sorted.median(baseAvgTimes) - 1.0;
 
         distMeanChange = new StaticArray<f64>(__astral__numResamples);
         distMedianChange = new StaticArray<f64>(__astral__numResamples);
 
         // two-sample bootstrap (stats/univariate/mod.rs > bootstrap)
         const numResamplesSqrt = <i32>ceil(sqrt(<f64>__astral__numResamples));
-        const perChunk =
-            (__astral__numResamples + numResamplesSqrt - 1) / numResamplesSqrt;
+        const perChunk = (__astral__numResamples + numResamplesSqrt - 1) / numResamplesSqrt;
         for (let i = 0; i < numResamplesSqrt; ++i) {
             const start = i * perChunk;
             const end = min((i + 1) * perChunk, __astral__numResamples);
 
             for (let j = 0; j < __astral__sampleSize; ++j) {
-                resampleX[j] =
-                    averageTimes[(Math.random() * __astral__sampleSize) as u32];
+                resampleX[j] = averageTimes[(Math.random() * __astral__sampleSize) as u32];
             }
 
             resampleX.sort();
             for (let k = start; k < end; ++k) {
                 for (let j = 0; j < __astral__sampleSize; ++j) {
-                    resampleY[j] =
-                        baseAvgTimes[
-                            (Math.random() * __astral__sampleSize) as u32
-                        ];
+                    resampleY[j] = baseAvgTimes[(Math.random() * __astral__sampleSize) as u32];
                 }
                 resampleY.sort();
-                distMeanChange[k] =
-                    Stats.mean(resampleX) / Stats.mean(resampleY) - 1.0;
-                distMedianChange[k] =
-                    Stats.sorted.median(resampleX) /
-                        Stats.sorted.median(resampleY) -
-                    1.0;
+                distMeanChange[k] = Stats.mean(resampleX) / Stats.mean(resampleY) - 1.0;
+                distMedianChange[k] = Stats.sorted.median(resampleX) / Stats.sorted.median(resampleY) - 1.0;
             }
         }
 
@@ -386,8 +361,7 @@ export function bench(descriptor: u32, routine: () => void): void {
 
     for (let i = 0; i < __astral__numResamples; ++i) {
         for (let j = 0; j < __astral__sampleSize; ++j) {
-            resampleY[j] =
-                averageTimes[(Math.random() * __astral__sampleSize) as u32];
+            resampleY[j] = averageTimes[(Math.random() * __astral__sampleSize) as u32];
         }
 
         resampleY.sort();
@@ -420,10 +394,7 @@ export function bench(descriptor: u32, routine: () => void): void {
     MADHB = Stats.sorted.CI.HB(distMAD);
 
     for (let i = 0; i < __astral__sampleSize; ++i) {
-        store<f64>(
-            baselineIters + ((<usize>i) << alignof<f64>()),
-            mIters[i] as f64
-        );
+        store<f64>(baselineIters + ((<usize>i) << alignof<f64>()), mIters[i] as f64);
         store<f64>(baselineTimes + ((<usize>i) << alignof<f64>()), times[i]);
     }
 
@@ -460,12 +431,7 @@ export function bench(descriptor: u32, routine: () => void): void {
 
     if (distMeanChange != null) {
         distMeanChange.sort();
-        change(
-            Stats.sorted.CI.LB(distMeanChange),
-            meanChangePoint,
-            Stats.sorted.CI.HB(distMeanChange),
-            pValue
-        );
+        change(Stats.sorted.CI.LB(distMeanChange), meanChangePoint, Stats.sorted.CI.HB(distMeanChange), pValue);
     }
 
     const mild = 1.5;

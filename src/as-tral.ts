@@ -24,19 +24,13 @@ if (typeof root !== "string") {
 
 let asc: typeof ASC;
 try {
-    asc = await import(
-        path.join(root, "node_modules", "assemblyscript", "dist", "asc.js")
-    );
+    asc = await import(path.join(root, "node_modules", "assemblyscript", "dist", "asc.js"));
 } catch {
-    console.log(
-        "ERROR: could not find node_modules/assemblyscript/dist/asc.js"
-    );
+    console.log("ERROR: could not find node_modules/assemblyscript/dist/asc.js");
 }
 
 const astralDir = path.join(root, "as-tral");
-const defaultBaseline = sfs.existsSync(path.join(astralDir, "base"))
-    ? "new"
-    : "base";
+const defaultBaseline = sfs.existsSync(path.join(astralDir, "base")) ? "new" : "base";
 const baseline = flags.baseline ?? defaultBaseline;
 const baselineDir = path.join(astralDir, baseline);
 const saveBaseline = flags.saveBaseline ?? defaultBaseline;
@@ -53,9 +47,7 @@ const folderMap = new Map<string, string[]>();
 
 let files;
 try {
-    const globPattern = path
-        .join(root, "assembly", "__benches__", "**", "*.ts")
-        .replace(/\\/g, "/"); // may be a hack?
+    const globPattern = path.join(root, "assembly", "__benches__", "**", "*.ts").replace(/\\/g, "/"); // may be a hack?
     files = await glob(globPattern);
 } catch (e: any) {
     console.log("ERROR: could not find directory " + e.path);
@@ -138,9 +130,7 @@ async function compileFile(file: string) {
             }
 
             try {
-                const results = sfs
-                    .readdirSync(folder)
-                    .filter(file => /^(?!.*\.d\.ts$).*\.ts$/.test(file));
+                const results = sfs.readdirSync(folder).filter(file => /^(?!.*\.d\.ts$).*\.ts$/.test(file));
                 folderMap.set(folder, results);
                 return results;
             } catch (e) {
@@ -183,19 +173,13 @@ async function benchWASM(info: Info, binary: Uint8Array) {
             warmup(descriptor: number) {
                 currentBench = info.enumeration[descriptor];
                 console.log();
-                console.log(
-                    `Benchmarking ${currentBench}: Warming up for ${formatTime(
-                        info.warmupTime
-                    )}`
-                );
+                console.log(`Benchmarking ${currentBench}: Warming up for ${formatTime(info.warmupTime)}`);
 
                 load();
             },
             start(estimatedMs: number, iterCount: number) {
                 console.log(
-                    `Benchmarking ${currentBench}: Collecting ${
-                        info.sampleSize
-                    } samples in estimated ${formatTime(
+                    `Benchmarking ${currentBench}: Collecting ${info.sampleSize} samples in estimated ${formatTime(
                         estimatedMs
                     )} (${formatIterCount(iterCount)})`
                 );
@@ -203,14 +187,8 @@ async function benchWASM(info: Info, binary: Uint8Array) {
             analyzing() {
                 console.log(`Benchmarking ${currentBench}: Analyzing`);
             },
-            faultyConfig(
-                linear: number,
-                actualTime: number,
-                recommendedSampleSize: number
-            ) {
-                let msg = `Warning: Unable to complete ${
-                    info.sampleSize
-                } samples in ${formatTime(
+            faultyConfig(linear: number, actualTime: number, recommendedSampleSize: number) {
+                let msg = `Warning: Unable to complete ${info.sampleSize} samples in ${formatTime(
                     info.measurementTime
                 )}. You may wish to increase target time to ${actualTime}`;
 
@@ -234,15 +212,12 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                 );
             },
             result(lb: number, time: number, hb: number) {
-                const header =
-                    currentBench + " ".repeat(24 - currentBench.length);
+                const header = currentBench + " ".repeat(24 - currentBench.length);
                 const lbs = formatTime(lb);
                 const times = formatTime(time);
                 const hbs = formatTime(hb);
 
-                console.log(
-                    chalk`{green ${header}}time: [{gray ${lbs}} {bold ${times}} {gray ${hbs}}]`
-                );
+                console.log(chalk`{green ${header}}time: [{gray ${lbs}} {bold ${times}} {gray ${hbs}}]`);
             },
 
             change(lb: number, time: number, hb: number, pValue: number) {
@@ -286,16 +261,12 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                 const nopercent = formatPercent(percent(noutliers));
 
                 console.log(
-                    chalk.yellow(
-                        `Found ${noutliers} outliers among ${info.sampleSize} measurements (${nopercent}%)`
-                    )
+                    chalk.yellow(`Found ${noutliers} outliers among ${info.sampleSize} measurements (${nopercent}%)`)
                 );
 
                 const print = (n: number, label: string) => {
                     if (n != 0) {
-                        console.log(
-                            `  ${n} (${formatPercent(percent(n))}%) ${label}`
-                        );
+                        console.log(`  ${n} (${formatPercent(percent(n))}%) ${label}`);
                     }
                 };
 
@@ -319,17 +290,11 @@ async function benchWASM(info: Info, binary: Uint8Array) {
             recursive: true
         });
         const samplePath = path.join(baselineDir, currentBench, "sample.json");
-        const estimatesPath = path.join(
-            baselineDir,
-            currentBench,
-            "estimates.json"
-        );
+        const estimatesPath = path.join(baselineDir, currentBench, "estimates.json");
         if (sfs.existsSync(samplePath) && sfs.existsSync(estimatesPath)) {
             const memory = <WebAssembly.Memory>(<unknown>exports.memory);
 
-            const sample: Sample = JSON.parse(
-                sfs.readFileSync(samplePath, { encoding: "utf-8" })
-            );
+            const sample: Sample = JSON.parse(sfs.readFileSync(samplePath, { encoding: "utf-8" }));
             const baselineIters = new Float64Array(
                 memory.buffer,
                 (<WebAssembly.Global>(<unknown>exports.baselineIters)).value,
@@ -341,10 +306,7 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                 info.sampleSize
             );
 
-            if (
-                info.sampleSize !== sample.iters?.length ||
-                info.sampleSize !== sample.times?.length
-            ) {
+            if (info.sampleSize !== sample.iters?.length || info.sampleSize !== sample.times?.length) {
                 console.log("Warning: unsupported sample size mismatch"); // TODO?
                 return;
             }
@@ -355,19 +317,13 @@ async function benchWASM(info: Info, binary: Uint8Array) {
             }
 
             let flags = 0b1;
-            const estimates: Estimates = JSON.parse(
-                sfs.readFileSync(estimatesPath, { encoding: "utf-8" })
-            );
+            const estimates: Estimates = JSON.parse(sfs.readFileSync(estimatesPath, { encoding: "utf-8" }));
 
             function setGlobals(name: string, estimate: Estimate) {
-                (<WebAssembly.Global>(<unknown>exports[name + "LB"])).value =
-                    estimate.confidence_interval.lower_bound;
-                (<WebAssembly.Global>(<unknown>exports[name + "HB"])).value =
-                    estimate.confidence_interval.upper_bound;
-                (<WebAssembly.Global>(<unknown>exports[name + "Point"])).value =
-                    estimate.point_estimate;
-                (<WebAssembly.Global>(<unknown>exports[name + "Error"])).value =
-                    estimate.standard_error;
+                (<WebAssembly.Global>(<unknown>exports[name + "LB"])).value = estimate.confidence_interval.lower_bound;
+                (<WebAssembly.Global>(<unknown>exports[name + "HB"])).value = estimate.confidence_interval.upper_bound;
+                (<WebAssembly.Global>(<unknown>exports[name + "Point"])).value = estimate.point_estimate;
+                (<WebAssembly.Global>(<unknown>exports[name + "Error"])).value = estimate.standard_error;
             }
 
             setGlobals("mean", estimates.mean);
@@ -408,28 +364,17 @@ async function benchWASM(info: Info, binary: Uint8Array) {
             sample.times[i] = baselineTimes[i];
         }
 
-        sfs.writeFileSync(
-            path.join(baselineDir, currentBench, "sample.json"),
-            JSON.stringify(sample)
-        );
+        sfs.writeFileSync(path.join(baselineDir, currentBench, "sample.json"), JSON.stringify(sample));
 
         function getEstimate(name: string): Estimate {
             return {
                 confidence_interval: {
                     confidence_level: info.confidenceLevel,
-                    lower_bound: (<WebAssembly.Global>(
-                        (<unknown>exports[name + "LB"])
-                    )).value,
-                    upper_bound: (<WebAssembly.Global>(
-                        (<unknown>exports[name + "HB"])
-                    )).value
+                    lower_bound: (<WebAssembly.Global>(<unknown>exports[name + "LB"])).value,
+                    upper_bound: (<WebAssembly.Global>(<unknown>exports[name + "HB"])).value
                 },
-                point_estimate: (<WebAssembly.Global>(
-                    (<unknown>exports[name + "Point"])
-                )).value,
-                standard_error: (<WebAssembly.Global>(
-                    (<unknown>exports[name + "Error"])
-                )).value
+                point_estimate: (<WebAssembly.Global>(<unknown>exports[name + "Point"])).value,
+                standard_error: (<WebAssembly.Global>(<unknown>exports[name + "Error"])).value
             };
         }
 
@@ -445,10 +390,7 @@ async function benchWASM(info: Info, binary: Uint8Array) {
             estimates.slope = getEstimate("slope");
         }
 
-        sfs.writeFileSync(
-            path.join(baselineDir, currentBench, "estimates.json"),
-            JSON.stringify(estimates)
-        );
+        sfs.writeFileSync(path.join(baselineDir, currentBench, "estimates.json"), JSON.stringify(estimates));
     }
     (<Function>exports.benchmark)();
 }

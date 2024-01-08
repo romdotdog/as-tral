@@ -74,9 +74,7 @@ function readNumberOrFloat(node: Node): number | null {
 }
 
 function readString(node: Node): string | null {
-    return node.isLiteralKind(LiteralKind.String)
-        ? (<StringLiteralExpression>node).value
-        : null;
+    return node.isLiteralKind(LiteralKind.String) ? (<StringLiteralExpression>node).value : null;
 }
 
 const encoder = new TextEncoder();
@@ -98,29 +96,15 @@ class Astral extends Transform {
             const range = src.range;
             const imp = Node.createImportStatement(
                 [
-                    Node.createImportDeclaration(
-                        Node.createIdentifierExpression("bench", range),
-                        null,
-                        range
-                    ),
-                    Node.createImportDeclaration(
-                        Node.createIdentifierExpression("blackbox", range),
-                        null,
-                        range
-                    )
+                    Node.createImportDeclaration(Node.createIdentifierExpression("bench", range), null, range),
+                    Node.createImportDeclaration(Node.createIdentifierExpression("blackbox", range), null, range)
                 ],
                 Node.createStringLiteralExpression("__astral__", range),
                 range
             );
 
             const exp = Node.createExportStatement(
-                reexport.map(v =>
-                    Node.createExportMember(
-                        Node.createIdentifierExpression(v, range),
-                        null,
-                        range
-                    )
-                ),
+                reexport.map(v => Node.createExportMember(Node.createIdentifierExpression(v, range), null, range)),
                 Node.createStringLiteralExpression("__astral__", range),
                 false,
                 range
@@ -133,12 +117,9 @@ class Astral extends Transform {
                     const expr = (<ExpressionStatement>stmt).expression;
                     if (expr.kind == NodeKind.Call) {
                         const call = <CallExpression>expr;
-                        if (call.expression.kind != NodeKind.Identifier)
-                            continue;
+                        if (call.expression.kind != NodeKind.Identifier) continue;
 
-                        const functionName = (<IdentifierExpression>(
-                            call.expression
-                        )).text;
+                        const functionName = (<IdentifierExpression>call.expression).text;
 
                         switch (functionName) {
                             case "set": {
@@ -147,25 +128,13 @@ class Astral extends Transform {
 
                                 if (
                                     settings.kind != NodeKind.Literal ||
-                                    (<LiteralExpression>settings).literalKind !=
-                                        LiteralKind.Object
+                                    (<LiteralExpression>settings).literalKind != LiteralKind.Object
                                 )
                                     continue;
 
-                                const settingsObject = <
-                                    ObjectLiteralExpression
-                                >settings;
-                                for (
-                                    let i = 0, l = settingsObject.names.length;
-                                    i < l;
-                                    ++i
-                                ) {
-                                    parseSetting(
-                                        parser,
-                                        info,
-                                        settingsObject.names[i],
-                                        settingsObject.values[i]
-                                    );
+                                const settingsObject = <ObjectLiteralExpression>settings;
+                                for (let i = 0, l = settingsObject.names.length; i < l; ++i) {
+                                    parseSetting(parser, info, settingsObject.names[i], settingsObject.values[i]);
                                 }
 
                                 src.statements.splice(i--, 1);
@@ -177,20 +146,16 @@ class Astral extends Transform {
 
                                 if (
                                     string.kind != NodeKind.Literal ||
-                                    (<LiteralExpression>string).literalKind !=
-                                        LiteralKind.String
+                                    (<LiteralExpression>string).literalKind != LiteralKind.String
                                 )
                                     continue;
 
-                                call.args[0] =
-                                    Node.createIntegerLiteralExpression(
-                                        i64_new(info.enumeration.length),
-                                        string.range
-                                    );
-
-                                info.enumeration.push(
-                                    (<StringLiteralExpression>string).value
+                                call.args[0] = Node.createIntegerLiteralExpression(
+                                    i64_new(info.enumeration.length),
+                                    string.range
                                 );
+
+                                info.enumeration.push((<StringLiteralExpression>string).value);
                                 break;
                             }
                         }
@@ -207,10 +172,7 @@ class Astral extends Transform {
             if (type == "f64") {
                 expr = Node.createFloatLiteralExpression(info[name], src.range);
             } else {
-                expr = Node.createIntegerLiteralExpression(
-                    i64_new(info[name]),
-                    src.range
-                );
+                expr = Node.createIntegerLiteralExpression(i64_new(info[name]), src.range);
             }
 
             return Node.createVariableDeclaration(
@@ -240,40 +202,21 @@ class Astral extends Transform {
             )
         );
 
-        this.writeFile(
-            "__astralinfo__",
-            encoder.encode(JSON.stringify(info)),
-            "."
-        );
+        this.writeFile("__astralinfo__", encoder.encode(JSON.stringify(info)), ".");
     }
 }
 
 // https://github.com/bheisler/criterion.rs/blob/970aa04aa5ee0514d1930c83a58c6ca994727567/src/lib.rs#L504
-function parseSetting(
-    parser: Parser,
-    info: Info,
-    ident: IdentifierExpression,
-    val: Node
-): boolean {
+function parseSetting(parser: Parser, info: Info, ident: IdentifierExpression, val: Node): boolean {
     const name = ident.text;
     switch (name) {
         case "warmupTime": {
             const num = readNumberOrFloat(val);
             if (num === null) {
-                parser.error(
-                    DiagnosticCode.Transform_0_1,
-                    val.range,
-                    "as-tral",
-                    "this warmupTime is invalid."
-                );
+                parser.error(DiagnosticCode.Transform_0_1, val.range, "as-tral", "this warmupTime is invalid.");
                 return false;
             } else if (num <= 0) {
-                parser.error(
-                    DiagnosticCode.Transform_0_1,
-                    val.range,
-                    "as-tral",
-                    "warmupTime must be greater than 0."
-                );
+                parser.error(DiagnosticCode.Transform_0_1, val.range, "as-tral", "warmupTime must be greater than 0.");
                 return false;
             }
             info.warmupTime = num;
@@ -282,12 +225,7 @@ function parseSetting(
         case "measurementTime": {
             const num = readNumberOrFloat(val);
             if (num === null) {
-                parser.error(
-                    DiagnosticCode.Transform_0_1,
-                    val.range,
-                    "as-tral",
-                    "this measurementTime is invalid."
-                );
+                parser.error(DiagnosticCode.Transform_0_1, val.range, "as-tral", "this measurementTime is invalid.");
                 return false;
             } else if (num <= 0) {
                 parser.error(
@@ -304,20 +242,10 @@ function parseSetting(
         case "sampleSize": {
             const num = readNumberOrFloat(val);
             if (num === null) {
-                parser.error(
-                    DiagnosticCode.Transform_0_1,
-                    val.range,
-                    "as-tral",
-                    "this sampleSize is invalid."
-                );
+                parser.error(DiagnosticCode.Transform_0_1, val.range, "as-tral", "this sampleSize is invalid.");
                 return false;
             } else if (num < 10) {
-                parser.error(
-                    DiagnosticCode.Transform_0_1,
-                    val.range,
-                    "as-tral",
-                    "sampleSize must be at least 10."
-                );
+                parser.error(DiagnosticCode.Transform_0_1, val.range, "as-tral", "sampleSize must be at least 10.");
                 return false;
             }
             info.sampleSize = num;
@@ -326,12 +254,7 @@ function parseSetting(
         case "numResamples": {
             const num = readNumberOrFloat(val);
             if (num === null) {
-                parser.error(
-                    DiagnosticCode.Transform_0_1,
-                    val.range,
-                    "as-tral",
-                    "this numResamples is invalid."
-                );
+                parser.error(DiagnosticCode.Transform_0_1, val.range, "as-tral", "this numResamples is invalid.");
                 return false;
             } else if (num < 1000) {
                 parser.warning(
@@ -358,24 +281,14 @@ function parseSetting(
                     info.samplingMode = 2;
                     return true;
                 default:
-                    parser.error(
-                        DiagnosticCode.Transform_0_1,
-                        val.range,
-                        "as-tral",
-                        "this samplingMode is invalid."
-                    );
+                    parser.error(DiagnosticCode.Transform_0_1, val.range, "as-tral", "this samplingMode is invalid.");
             }
             return true;
         }
         case "confidenceLevel": {
             const num = readNumberOrFloat(val);
             if (num === null) {
-                parser.error(
-                    DiagnosticCode.Transform_0_1,
-                    val.range,
-                    "as-tral",
-                    "this confidenceLevel is invalid."
-                );
+                parser.error(DiagnosticCode.Transform_0_1, val.range, "as-tral", "this confidenceLevel is invalid.");
                 return false;
             } else if (num <= 0 || num >= 1) {
                 parser.error(
@@ -399,12 +312,7 @@ function parseSetting(
         case "significanceLevel": {
             const num = readNumberOrFloat(val);
             if (num === null) {
-                parser.error(
-                    DiagnosticCode.Transform_0_1,
-                    val.range,
-                    "as-tral",
-                    "this significanceLevel is invalid."
-                );
+                parser.error(DiagnosticCode.Transform_0_1, val.range, "as-tral", "this significanceLevel is invalid.");
                 return false;
             } else if (num <= 0 || num >= 1) {
                 parser.error(
@@ -421,20 +329,10 @@ function parseSetting(
         case "noiseThreshold": {
             const num = readNumberOrFloat(val);
             if (num === null) {
-                parser.error(
-                    DiagnosticCode.Transform_0_1,
-                    val.range,
-                    "as-tral",
-                    "this noiseThreshold is invalid."
-                );
+                parser.error(DiagnosticCode.Transform_0_1, val.range, "as-tral", "this noiseThreshold is invalid.");
                 return false;
             } else if (num < 0) {
-                parser.error(
-                    DiagnosticCode.Transform_0_1,
-                    val.range,
-                    "as-tral",
-                    "noiseThreshold must be at least 0."
-                );
+                parser.error(DiagnosticCode.Transform_0_1, val.range, "as-tral", "noiseThreshold must be at least 0.");
                 return false;
             }
             info.noiseThreshold = num;
@@ -442,12 +340,7 @@ function parseSetting(
         }
     }
 
-    parser.error(
-        DiagnosticCode.Transform_0_1,
-        ident.range,
-        "as-tral",
-        `${name} is not a valid setting.`
-    );
+    parser.error(DiagnosticCode.Transform_0_1, ident.range, "as-tral", `${name} is not a valid setting.`);
     return false;
 }
 

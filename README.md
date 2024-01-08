@@ -42,9 +42,7 @@ Your benchmark will live in this file. Let's create an example benchmark.
 ```ts
 // to ensure accurate benchmarks, we must make sure that binaryen doesn't do any sneaky
 // optimizations on our input without us knowing. Thus, we must use `blackbox`.
-const input = blackbox(
-    "The quick brown fox jumped over the lazy dog.".repeat(10)
-);
+const input = blackbox("The quick brown fox jumped over the lazy dog.".repeat(10));
 
 // our string here must be a compile time constant.
 // open an issue if you'd like to see this constraint lifted.
