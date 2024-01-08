@@ -71,6 +71,34 @@ Found 4 outliers among 100 measurements (4%)
 
 Pretty fast!
 
+## Suites [(feature request)](https://github.com/romdotdog/as-tral/issues/3)
+
+Would you like extra output that looks like this?
+
+```
+Relative to bubble sort
+insertion sort          delta: [-39.704% -38.188% -36.807%] (p = 0.00 < 0.05)
+selection sort          delta: [-70.733% -70.102% -69.483%] (p = 0.00 < 0.05)
+merge sort              delta: [-81.935% -81.587% -81.226%] (p = 0.00 < 0.05)
+quick sort              delta: [-91.517% -91.358% -91.201%] (p = 0.00 < 0.05)
+```
+
+Simply group your benchmarks using `suite`.
+
+```ts
+suite("sort", () => {
+    bench("bubble sort", () => {
+        bubbleSort();
+    });
+
+    bench("insertion sort", () => {
+        insertionSort();
+    });
+
+    // ...
+});
+```
+
 ## Flags
 
 The CLI interprets all flags before `--` as [AssemblyScript compiler options.](https://www.assemblyscript.org/compiler.html#compiler-options) For example, to enable ESM bindings,
