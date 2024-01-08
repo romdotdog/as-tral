@@ -13,4 +13,5 @@ interface Settings {
 
 declare function set(settings: Settings): void;
 declare function blackbox<T>(x: T): T;
+declare function suite(description: string, routine: () => void): void;
 declare function bench(description: string, routine: () => void): void;

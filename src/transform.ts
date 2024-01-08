@@ -14,7 +14,10 @@ import {
     IntegerLiteralExpression,
     CommonFlags,
     DiagnosticCode,
-    Expression
+    Expression,
+    Statement,
+    FunctionExpression,
+    BlockStatement
 } from "assemblyscript/dist/assemblyscript.js";
 
 import { join, dirname } from "path";
@@ -77,6 +80,23 @@ function readString(node: Node): string | null {
     return node.isLiteralKind(LiteralKind.String) ? (<StringLiteralExpression>node).value : null;
 }
 
+type ParseableCall = ExpressionStatement & {
+    expression: CallExpression & { expression: IdentifierExpression };
+};
+
+function isParseableCall(stmt: Statement): stmt is ParseableCall {
+    if (stmt.kind == NodeKind.Expression) {
+        const expr = (<ExpressionStatement>stmt).expression;
+        if (expr.kind == NodeKind.Call) {
+            const call = <CallExpression>expr;
+            if (call.expression.kind != NodeKind.Identifier) return false;
+
+            return true;
+        }
+    }
+    return false;
+}
+
 const encoder = new TextEncoder();
 class Astral extends Transform {
     afterParse(parser: Parser) {
@@ -113,52 +133,26 @@ class Astral extends Transform {
             src.statements.unshift(imp, exp);
             for (let i = 0; i < src.statements.length; i++) {
                 const stmt = src.statements[i];
-                if (stmt.kind == NodeKind.Expression) {
-                    const expr = (<ExpressionStatement>stmt).expression;
-                    if (expr.kind == NodeKind.Call) {
-                        const call = <CallExpression>expr;
-                        if (call.expression.kind != NodeKind.Identifier) continue;
+                if (isParseableCall(stmt)) {
+                    const call = stmt.expression;
+                    if (call.expression.text === "set") {
+                        if (call.args.length != 1) continue;
+                        const settings = call.args[0];
 
-                        const functionName = (<IdentifierExpression>call.expression).text;
+                        if (
+                            settings.kind != NodeKind.Literal ||
+                            (<LiteralExpression>settings).literalKind != LiteralKind.Object
+                        )
+                            continue;
 
-                        switch (functionName) {
-                            case "set": {
-                                if (call.args.length != 1) continue;
-                                const settings = call.args[0];
-
-                                if (
-                                    settings.kind != NodeKind.Literal ||
-                                    (<LiteralExpression>settings).literalKind != LiteralKind.Object
-                                )
-                                    continue;
-
-                                const settingsObject = <ObjectLiteralExpression>settings;
-                                for (let i = 0, l = settingsObject.names.length; i < l; ++i) {
-                                    parseSetting(parser, info, settingsObject.names[i], settingsObject.values[i]);
-                                }
-
-                                src.statements.splice(i--, 1);
-                                break;
-                            }
-                            case "bench": {
-                                if (call.args.length != 2) continue;
-                                const string = call.args[0];
-
-                                if (
-                                    string.kind != NodeKind.Literal ||
-                                    (<LiteralExpression>string).literalKind != LiteralKind.String
-                                )
-                                    continue;
-
-                                call.args[0] = Node.createIntegerLiteralExpression(
-                                    i64_new(info.enumeration.length),
-                                    string.range
-                                );
-
-                                info.enumeration.push((<StringLiteralExpression>string).value);
-                                break;
-                            }
+                        const settingsObject = <ObjectLiteralExpression>settings;
+                        for (let i = 0, l = settingsObject.names.length; i < l; ++i) {
+                            parseSetting(parser, info, settingsObject.names[i], settingsObject.values[i]);
                         }
+
+                        src.statements.splice(i--, 1);
+                    } else {
+                        traverseSuitesAndBenches(info, stmt);
                     }
                 }
             }
@@ -203,6 +197,45 @@ class Astral extends Transform {
         );
 
         this.writeFile("__astralinfo__", encoder.encode(JSON.stringify(info)), ".");
+    }
+}
+
+function traverseSuitesAndBenches(info: Info, stmt: ParseableCall) {
+    const call = stmt.expression;
+    if (call.expression.text === "bench") {
+        if (call.args.length != 2) return;
+        const string = call.args[0];
+
+        if (string.kind != NodeKind.Literal || (<LiteralExpression>string).literalKind != LiteralKind.String) return;
+
+        call.args[0] = Node.createIntegerLiteralExpression(i64_new(info.enumeration.length), string.range);
+
+        info.enumeration.push((<StringLiteralExpression>string).value);
+    } else if (call.expression.text === "suite") {
+        if (call.args.length != 2) return;
+        const string = call.args[0];
+
+        if (string.kind != NodeKind.Literal || (<LiteralExpression>string).literalKind != LiteralKind.String) return;
+
+        const lambda = call.args[1];
+
+        if (lambda.kind != NodeKind.Function) return;
+
+        const bodyFunction = (<FunctionExpression>lambda).declaration.body;
+
+        if (bodyFunction === null) return;
+
+        call.args[0] = Node.createIntegerLiteralExpression(i64_new(info.enumeration.length), string.range);
+
+        info.enumeration.push((<StringLiteralExpression>string).value);
+        const stmts = bodyFunction.kind === NodeKind.Block ? (<BlockStatement>bodyFunction).statements : [bodyFunction];
+
+        for (let i = 0; i < stmts.length; i++) {
+            const nstmt = stmts[i];
+            if (nstmt !== null && isParseableCall(nstmt)) {
+                traverseSuitesAndBenches(info, nstmt);
+            }
+        }
     }
 }
 

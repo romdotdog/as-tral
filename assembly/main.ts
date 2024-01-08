@@ -1,4 +1,7 @@
 declare function now(): f64;
+declare function startSuite(descriptor: u32): void;
+declare function pushChangeToSuite(timeLB: f64, time: f64, timeHB: f64, pValue: f64): void;
+declare function endSuite(): void;
 declare function warmup(descriptor: u32): void;
 declare function start(estimatedMs: f64, iterCount: f64): void;
 declare function analyzing(): void;
@@ -19,7 +22,7 @@ namespace Sampling {
         return expectedMs > 2 * targetTime;
     }
 
-    export function linearSampling(met: f64): StaticArray<u64> {
+    export function linearSampling(arrToWrite: StaticArray<u64>, met: f64): void {
         const sampleCount = __astral__sampleSize as u64;
         const targetTime = __astral__measurementTime as f64;
         const totalRuns = ((sampleCount * (sampleCount + 1)) / 2) as f64;
@@ -32,14 +35,12 @@ namespace Sampling {
         }
 
         const sci32 = sampleCount as i32; // ??
-        const arr = new StaticArray<u64>(sci32);
         for (let i = 0, a = 1; i < sci32; i = a++) {
-            arr[i] = a * d;
+            arrToWrite[i] = a * d;
         }
-        return arr;
     }
 
-    export function flatSampling(met: f64): StaticArray<u64> {
+    export function flatSampling(arrToWrite: StaticArray<u64>, met: f64): void {
         const sampleCount = __astral__sampleSize;
         const msPerSample = (__astral__measurementTime as f64) / (sampleCount as f64);
         // provisional
@@ -50,11 +51,9 @@ namespace Sampling {
             faultyConfig(0, expectedMs, recommendFlatSampleSize(met));
         }
 
-        const arr = new StaticArray<u64>(sampleCount);
         for (let i = 0; i < sampleCount; ++i) {
-            arr[i] = iterationsPerSample;
+            arrToWrite[i] = iterationsPerSample;
         }
-        return arr;
     }
 
     function recommendLinearSampleSize(met: f64): f64 {
@@ -214,7 +213,11 @@ export let stdDevPoint: f64 = 0;
 export let stdDevError: f64 = 0;
 
 const times = new StaticArray<f64>(__astral__sampleSize);
+const suiteTimes = new StaticArray<f64>(__astral__sampleSize);
 const averageTimes = new StaticArray<f64>(__astral__sampleSize);
+
+const mIters = new StaticArray<u64>(__astral__sampleSize);
+const suiteIters = new StaticArray<f64>(__astral__sampleSize);
 
 // bootstrapping arrays
 const resampleX = new StaticArray<f64>(__astral__sampleSize);
@@ -225,7 +228,9 @@ const baseAvgTimes = new StaticArray<f64>(__astral__sampleSize);
 
 const tDist = new StaticArray<f64>(__astral__numResamples);
 const distMeanChange = new StaticArray<f64>(__astral__numResamples);
-const distMedianChange = new StaticArray<f64>(__astral__numResamples);
+// const distMedianChange = new StaticArray<f64>(__astral__numResamples);
+let meanChangePoint: f64 = 0;
+let pValue: f64 = 0;
 
 const distMean = new StaticArray<f64>(__astral__numResamples);
 const distStdDev = new StaticArray<f64>(__astral__numResamples);
@@ -235,6 +240,12 @@ const distMAD = new StaticArray<f64>(__astral__numResamples);
 // for linear sampling
 const mItersF = new StaticArray<f64>(__astral__sampleSize);
 const distFit = new StaticArray<f64>(__astral__numResamples);
+
+export function suite(descriptor: u32, routine: () => void): void {
+    startSuite(descriptor);
+    routine();
+    endSuite();
+}
 
 export function bench(descriptor: u32, routine: () => void): void {
     // warmup
@@ -264,7 +275,11 @@ export function bench(descriptor: u32, routine: () => void): void {
     const useFlatSampling =
         __astral__samplingMode == 0 ? Sampling.chooseSamplingMode(met) : __astral__samplingMode == 2;
 
-    const mIters = useFlatSampling ? Sampling.flatSampling(met) : Sampling.linearSampling(met);
+    if (useFlatSampling) {
+        Sampling.flatSampling(mIters, met);
+    } else {
+        Sampling.linearSampling(mIters, met);
+    }
 
     let expectedMs: f64 = 0;
     let totalIters: f64 = 0;
@@ -298,62 +313,8 @@ export function bench(descriptor: u32, routine: () => void): void {
     averageTimes.sort();
 
     // check if there is a baseline
-    let tPoint: f64 = 0;
-    let meanChangePoint: f64 = 0;
-    let medianChangePoint: f64 = 0;
-    let pValue: f64 = 0;
-    const existsBaseline = (flags & 0b1) != 0;
-    if (existsBaseline) {
-        for (let i = 0; i < __astral__sampleSize; ++i) {
-            const baseAvgTime =
-                load<f64>(baselineTimes + ((<usize>i) << alignof<f64>())) /
-                load<f64>(baselineIters + ((<usize>i) << alignof<f64>()));
-            baseAvgTimes[i] = baseAvgTime;
-
-            sample[i] = averageTimes[i];
-            sample[i + __astral__sampleSize] = baseAvgTime;
-        }
-
-        // mixed two-sample bootstrap on t score (analysis/compare.rs > t_test)
-        tPoint = Stats.t(averageTimes, baseAvgTimes);
-        for (let i = 0; i < __astral__numResamples; ++i) {
-            for (let j = 0; j < __astral__sampleSize; ++j) {
-                resampleX[j] = sample[(Math.random() * __astral__sampleSize * 2) as u32];
-                resampleY[j] = sample[(Math.random() * __astral__sampleSize * 2) as u32];
-            }
-            tDist[i] = Stats.t(resampleX, resampleY);
-            // filter out non-finite numbers?
-        }
-
-        // estimate change (analysis/compare.rs > estimates)
-        meanChangePoint = Stats.mean(averageTimes) / Stats.mean(baseAvgTimes) - 1.0;
-
-        baseAvgTimes.sort();
-        medianChangePoint = Stats.sorted.median(averageTimes) / Stats.sorted.median(baseAvgTimes) - 1.0;
-
-        // two-sample bootstrap (stats/univariate/mod.rs > bootstrap)
-        const numResamplesSqrt = <i32>ceil(sqrt(<f64>__astral__numResamples));
-        const perChunk = (__astral__numResamples + numResamplesSqrt - 1) / numResamplesSqrt;
-        for (let i = 0; i < numResamplesSqrt; ++i) {
-            const start = i * perChunk;
-            const end = min((i + 1) * perChunk, __astral__numResamples);
-
-            for (let j = 0; j < __astral__sampleSize; ++j) {
-                resampleX[j] = averageTimes[(Math.random() * __astral__sampleSize) as u32];
-            }
-
-            resampleX.sort();
-            for (let k = start; k < end; ++k) {
-                for (let j = 0; j < __astral__sampleSize; ++j) {
-                    resampleY[j] = baseAvgTimes[(Math.random() * __astral__sampleSize) as u32];
-                }
-                resampleY.sort();
-                distMeanChange[k] = Stats.mean(resampleX) / Stats.mean(resampleY) - 1.0;
-                distMedianChange[k] = Stats.sorted.median(resampleX) / Stats.sorted.median(resampleY) - 1.0;
-            }
-        }
-
-        pValue = Stats.p_value_2(tDist, tPoint);
+    if ((flags & 0b1) != 0) {
+        compare(baselineTimes, baselineIters);
     }
 
     meanPoint = Stats.mean(averageTimes);
@@ -362,7 +323,6 @@ export function bench(descriptor: u32, routine: () => void): void {
     MADPoint = Stats.sorted.MAD(averageTimes, medianPoint);
 
     // bootstrapping
-
     for (let i = 0; i < __astral__numResamples; ++i) {
         for (let j = 0; j < __astral__sampleSize; ++j) {
             resampleY[j] = averageTimes[(Math.random() * __astral__sampleSize) as u32];
@@ -403,9 +363,10 @@ export function bench(descriptor: u32, routine: () => void): void {
     }
 
     // regression
-
-    if (!useFlatSampling) {
-        flags = 0b10;
+    if (useFlatSampling) {
+        result(meanLB, meanPoint, meanHB);
+    } else {
+        flags |= 0b10;
         for (let i = 0; i < __astral__sampleSize; ++i) {
             mItersF[i] = mIters[i] as f64;
         }
@@ -426,14 +387,32 @@ export function bench(descriptor: u32, routine: () => void): void {
         slopeLB = Stats.sorted.CI.LB(distFit);
         slopeHB = Stats.sorted.CI.HB(distFit);
         result(slopeLB, slopePoint, slopeHB);
-    } else {
-        flags = 0;
-        result(meanLB, meanPoint, meanHB);
     }
 
-    if (existsBaseline) {
+    // report change
+    if ((flags & 0b1) != 0) {
         distMeanChange.sort();
         change(Stats.sorted.CI.LB(distMeanChange), meanChangePoint, Stats.sorted.CI.HB(distMeanChange), pValue);
+    }
+
+    // is in a suite
+    if ((flags & 0b100) != 0) {
+        // benchmark already exists
+        if ((flags & 0b1000) != 0) {
+            compare(changetype<usize>(suiteTimes), changetype<usize>(suiteIters));
+            distMeanChange.sort();
+            pushChangeToSuite(
+                Stats.sorted.CI.LB(distMeanChange),
+                meanChangePoint,
+                Stats.sorted.CI.HB(distMeanChange),
+                pValue
+            );
+        } else {
+            for (let i = 0; i < __astral__sampleSize; ++i) {
+                suiteIters[i] = mIters[i] as f64;
+                suiteTimes[i] = times[i];
+            }
+        }
     }
 
     const mild = 1.5;
@@ -460,4 +439,59 @@ export function bench(descriptor: u32, routine: () => void): void {
     }
 
     outliers(los, lom, him, his);
+}
+
+function compare(times: usize, iters: usize): void {
+    let tPoint: f64 = 0;
+    // let medianChangePoint: f64 = 0;
+
+    for (let i = 0; i < __astral__sampleSize; ++i) {
+        const baseAvgTime =
+            load<f64>(times + ((<usize>i) << alignof<f64>())) / load<f64>(iters + ((<usize>i) << alignof<f64>()));
+        baseAvgTimes[i] = baseAvgTime;
+
+        sample[i] = averageTimes[i];
+        sample[i + __astral__sampleSize] = baseAvgTime;
+    }
+
+    // mixed two-sample bootstrap on t score (analysis/compare.rs > t_test)
+    tPoint = Stats.t(averageTimes, baseAvgTimes);
+    for (let i = 0; i < __astral__numResamples; ++i) {
+        for (let j = 0; j < __astral__sampleSize; ++j) {
+            resampleX[j] = sample[(Math.random() * __astral__sampleSize * 2) as u32];
+            resampleY[j] = sample[(Math.random() * __astral__sampleSize * 2) as u32];
+        }
+        tDist[i] = Stats.t(resampleX, resampleY);
+        // filter out non-finite numbers?
+    }
+
+    // estimate change (analysis/compare.rs > estimates)
+    meanChangePoint = Stats.mean(averageTimes) / Stats.mean(baseAvgTimes) - 1.0;
+
+    baseAvgTimes.sort();
+    // medianChangePoint = Stats.sorted.median(averageTimes) / Stats.sorted.median(baseAvgTimes) - 1.0;
+
+    // two-sample bootstrap (stats/univariate/mod.rs > bootstrap)
+    const numResamplesSqrt = <i32>ceil(sqrt(<f64>__astral__numResamples));
+    const perChunk = (__astral__numResamples + numResamplesSqrt - 1) / numResamplesSqrt;
+    for (let i = 0; i < numResamplesSqrt; ++i) {
+        const start = i * perChunk;
+        const end = min((i + 1) * perChunk, __astral__numResamples);
+
+        for (let j = 0; j < __astral__sampleSize; ++j) {
+            resampleX[j] = averageTimes[(Math.random() * __astral__sampleSize) as u32];
+        }
+
+        resampleX.sort();
+        for (let k = start; k < end; ++k) {
+            for (let j = 0; j < __astral__sampleSize; ++j) {
+                resampleY[j] = baseAvgTimes[(Math.random() * __astral__sampleSize) as u32];
+            }
+            resampleY.sort();
+            distMeanChange[k] = Stats.mean(resampleX) / Stats.mean(resampleY) - 1.0;
+            // distMedianChange[k] = Stats.sorted.median(resampleX) / Stats.sorted.median(resampleY) - 1.0;
+        }
+    }
+
+    pValue = Stats.p_value_2(tDist, tPoint);
 }

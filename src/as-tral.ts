@@ -165,13 +165,62 @@ async function compileFile(file: string) {
 
 async function benchWASM(info: Info, binary: Uint8Array) {
     let currentBench = "";
+    let currentSuite: string | undefined = undefined;
+    let suiteBenchmark: string | undefined = undefined;
+    let currentSuiteResults: [bench: string, lb: number, time: number, hb: number, pValue: number][] = [];
     const {
         instance: { exports }
     } = await WebAssembly.instantiate(binary, {
         __astral__: {
             now: () => performance.now(),
+            startSuite(descriptor: number) {
+                currentSuite = info.enumeration[descriptor];
+                console.log();
+                console.log(`Benchmarking ${currentSuite} suite`);
+            },
+            pushChangeToSuite(lb: number, time: number, hb: number, pValue: number) {
+                currentSuiteResults.push([currentBench, lb, time, hb, pValue]);
+            },
+            endSuite() {
+                const noise = info.noiseThreshold;
+                const sigThresh = info.significanceLevel;
+
+                // sort suite results by time
+                currentSuiteResults.sort((a, b) => b[2] - a[2]);
+
+                console.log();
+                console.log(`Suite ${currentSuite} finished`);
+                console.log(`Relative to ${suiteBenchmark}`);
+
+                for (const [bench, lb, time, hb, pValue] of currentSuiteResults) {
+                    let times = formatChange(time);
+                    if (lb < -noise && hb < -noise) {
+                        // improved
+                        times = chalk.green(times);
+                    }
+
+                    const header = bench + " ".repeat(24 - bench.length);
+                    const lbs = formatChange(lb);
+                    const hbs = formatChange(hb);
+
+                    const differentMean = pValue < sigThresh;
+                    const inequality = differentMean ? "<" : ">";
+
+                    console.log(
+                        chalk`{green ${header}}delta: [{gray ${lbs}} {bold ${times}} {gray ${hbs}}] (p = ${pValue.toFixed(
+                            2
+                        )} ${inequality} ${sigThresh.toFixed(2)})`
+                    );
+                }
+
+                console.log();
+
+                currentSuite = undefined;
+                suiteBenchmark = undefined;
+            },
             warmup(descriptor: number) {
                 currentBench = info.enumeration[descriptor];
+
                 console.log();
                 console.log(`Benchmarking ${currentBench}: Warming up for ${formatTime(info.warmupTime)}`);
 
@@ -316,7 +365,7 @@ async function benchWASM(info: Info, binary: Uint8Array) {
                 baselineTimes[i] = sample.times[i];
             }
 
-            let flags = 0b1;
+            let flags = 0b1 | (currentSuite !== undefined ? 0b100 : 0) | (suiteBenchmark !== undefined ? 0b1000 : 0);
             const estimates: Estimates = JSON.parse(sfs.readFileSync(estimatesPath, { encoding: "utf-8" }));
 
             function setGlobals(name: string, estimate: Estimate) {
@@ -332,11 +381,15 @@ async function benchWASM(info: Info, binary: Uint8Array) {
             setGlobals("stdDev", estimates.std_dev);
 
             if (estimates.slope) {
-                flags = 0b11;
+                flags |= 0b10;
                 setGlobals("slope", estimates.slope);
             }
 
             (<WebAssembly.Global>(<unknown>exports.flags)).value = flags;
+
+            if (currentSuite !== undefined && suiteBenchmark === undefined) {
+                suiteBenchmark = currentBench;
+            }
         }
     }
 
