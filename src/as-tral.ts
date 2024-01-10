@@ -217,6 +217,7 @@ async function benchWASM(info: Info, binary: Uint8Array) {
 
                 currentSuite = undefined;
                 suiteBenchmark = undefined;
+                currentSuiteResults = [];
             },
             warmup(descriptor: number) {
                 currentBench = info.enumeration[descriptor];
